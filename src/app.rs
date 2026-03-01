@@ -440,7 +440,7 @@ pub fn app() -> Html {
 
             // Modals
             <Modal id="tutorial" title="Tutorial" active={*tutorial_open} on_close={close_tutorial}>
-                {html! { <div>{TUTORIAL_CONTENT}</div> }}
+                {Html::from_html_unchecked(AttrValue::from(TUTORIAL_CONTENT))}
             </Modal>
 
             <Modal id="examples" title="Examples" active={*examples_open} on_close={close_examples}>
@@ -479,11 +479,11 @@ pub fn app() -> Html {
             </Modal>
 
             <Modal id="isaRef" title="ISA Reference" active={*isa_ref_open} on_close={close_isa_ref}>
-                {html! { <div>{ISA_REF_CONTENT}</div> }}
+                {Html::from_html_unchecked(AttrValue::from(ISA_REF_CONTENT))}
             </Modal>
 
             <Modal id="help" title="Help" active={*help_open} on_close={close_help}>
-                {html! { <div>{HELP_CONTENT}</div> }}
+                {Html::from_html_unchecked(AttrValue::from(HELP_CONTENT))}
             </Modal>
 
             // GitHub Corner
