@@ -6,11 +6,14 @@ pub struct ProgramAreaProps {
     pub on_assemble: Callback<String>,
     pub on_step: Callback<()>,
     pub on_run: Callback<()>,
+    pub on_stop: Callback<()>,
     pub on_reset: Callback<()>,
     pub assembly_output: Option<Html>,
     pub initial_code: Option<String>,
     pub step_enabled: bool,
     pub run_enabled: bool,
+    #[prop_or(false)]
+    pub is_running: bool,
 }
 
 #[function_component(ProgramArea)]
@@ -58,6 +61,13 @@ pub fn program_area(props: &ProgramAreaProps) -> Html {
         })
     };
 
+    let on_stop_click = {
+        let on_stop = props.on_stop.clone();
+        Callback::from(move |_: MouseEvent| {
+            on_stop.emit(());
+        })
+    };
+
     let on_reset_click = {
         let on_reset = props.on_reset.clone();
         Callback::from(move |_: MouseEvent| {
@@ -80,9 +90,13 @@ pub fn program_area(props: &ProgramAreaProps) -> Html {
             // Controls (middle)
             <div class="controls">
                 <button id="assembleBtn" onclick={on_assemble_click}>{"Assemble"}</button>
-                <button id="stepBtn" onclick={on_step_click} disabled={!props.step_enabled}>{"Step"}</button>
-                <button id="runBtn" onclick={on_run_click} disabled={!props.run_enabled}>{"Run"}</button>
-                <button id="resetBtn" onclick={on_reset_click}>{"Reset"}</button>
+                <button id="stepBtn" onclick={on_step_click} disabled={!props.step_enabled || props.is_running}>{"Step"}</button>
+                if props.is_running {
+                    <button id="stopBtn" class="stop-btn" onclick={on_stop_click}>{"Stop"}</button>
+                } else {
+                    <button id="runBtn" onclick={on_run_click} disabled={!props.run_enabled}>{"Run"}</button>
+                }
+                <button id="resetBtn" onclick={on_reset_click} disabled={props.is_running}>{"Reset"}</button>
             </div>
 
             // Assembly output (bottom half)

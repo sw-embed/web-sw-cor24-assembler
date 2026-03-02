@@ -106,6 +106,21 @@ button:disabled {
     cursor: not-allowed;
 }
 
+button.stop-btn {
+    background: #ff4444;
+    color: white;
+}
+
+button.stop-btn:hover {
+    background: #cc3333;
+}
+
+/* Info text for stopped execution */
+.info-text {
+    color: #00d9ff;
+    font-weight: bold;
+}
+
 /* ProgramArea Component */
 .program-area {
     background: #16213e;
@@ -527,7 +542,7 @@ table td {
 .challenge-banner {
     position: fixed;
     top: 8px;
-    right: 10px;
+    right: 120px; /* Move left to avoid GitHub corner link */
     background: #1565c0;
     color: white;
     padding: 6px 15px;

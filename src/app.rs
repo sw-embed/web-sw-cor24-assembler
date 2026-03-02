@@ -31,6 +31,10 @@ pub fn app() -> Html {
     let current_challenge_id = use_state(|| None::<usize>);
     let challenge_result = use_state(|| None::<Result<String, String>>);
 
+    // Animated run state for assembler tab
+    let asm_is_running = use_state(|| false);
+    let asm_stop_requested = use_state(|| false);
+
     // Modal states
     let tutorial_open = use_state(|| false);
     let examples_open = use_state(|| false);
@@ -175,26 +179,92 @@ pub fn app() -> Html {
     let on_run = {
         let cpu = cpu.clone();
         let assembly_output = assembly_output.clone();
+        let asm_is_running = asm_is_running.clone();
+        let asm_stop_requested = asm_stop_requested.clone();
 
         Callback::from(move |()| {
-            let mut new_cpu = (*cpu).clone();
-            match new_cpu.run() {
-                Ok(()) => {
-                    cpu.set(new_cpu);
-                    assembly_output.set(Some(html! {
-                        <div class="success-text">
-                            {"✓ Program completed"}
+            // Start animated run
+            asm_is_running.set(true);
+            asm_stop_requested.set(false);
+
+            let cpu_handle = cpu.clone();
+            let output_handle = assembly_output.clone();
+            let running_handle = asm_is_running.clone();
+            let stop_handle = asm_stop_requested.clone();
+            let current_cpu = (*cpu).clone();
+
+            // Start the animated run loop
+            fn run_step(
+                mut current_cpu: WasmCpu,
+                cpu_handle: yew::UseStateHandle<WasmCpu>,
+                output_handle: yew::UseStateHandle<Option<Html>>,
+                running_handle: yew::UseStateHandle<bool>,
+                stop_handle: yew::UseStateHandle<bool>,
+            ) {
+                // Check if stop was requested
+                if *stop_handle {
+                    cpu_handle.set(current_cpu);
+                    running_handle.set(false);
+                    output_handle.set(Some(yew::html! {
+                        <div class="info-text">
+                            {"⏹ Execution stopped"}
                         </div>
                     }));
+                    return;
                 }
-                Err(e) => {
-                    assembly_output.set(Some(html! {
-                        <div class="error-text">
-                            {format!("Error: {:?}", e)}
-                        </div>
-                    }));
+
+                // Execute a batch of instructions
+                let mut halted = false;
+                let mut error_msg = None;
+                for _ in 0..100 {
+                    if current_cpu.is_halted() {
+                        halted = true;
+                        break;
+                    }
+                    if let Err(e) = current_cpu.step() {
+                        error_msg = Some(format!("{:?}", e));
+                        halted = true;
+                        break;
+                    }
+                }
+
+                // Update CPU state for UI refresh
+                cpu_handle.set(current_cpu.clone());
+
+                if halted {
+                    running_handle.set(false);
+                    if let Some(err) = error_msg {
+                        output_handle.set(Some(yew::html! {
+                            <div class="error-text">
+                                {format!("Error: {}", err)}
+                            </div>
+                        }));
+                    } else {
+                        output_handle.set(Some(yew::html! {
+                            <div class="success-text">
+                                {"✓ Program completed"}
+                            </div>
+                        }));
+                    }
+                } else {
+                    // Continue running - schedule next batch
+                    gloo::timers::callback::Timeout::new(16, move || {
+                        run_step(current_cpu, cpu_handle, output_handle, running_handle, stop_handle);
+                    }).forget();
                 }
             }
+
+            // Start the first step
+            gloo::timers::callback::Timeout::new(0, move || {
+                run_step(current_cpu, cpu_handle, output_handle, running_handle, stop_handle);
+            }).forget();
+        })
+    };
+
+    let on_stop = {
+        let asm_stop_requested = asm_stop_requested.clone();
+        Callback::from(move |()| {
+            asm_stop_requested.set(true);
         })
     };
 
@@ -584,8 +654,10 @@ pub fn app() -> Html {
                 <ProgramArea
                     on_assemble={on_assemble}
                     on_step={on_step}
-                    on_run={on_run}
+                    on_run={on_run.clone()}
+                    on_stop={on_stop}
                     on_reset={on_reset}
+                    is_running={*asm_is_running}
                     assembly_output={
                         if !assembly_lines.is_empty() {
                             // Show highlighted assembly lines
@@ -842,12 +914,20 @@ pub fn app() -> Html {
                         let assembly_output = assembly_output.clone();
                         let assembly_lines = assembly_lines.clone();
                         let code = code.clone();
+                        let challenge_mode = challenge_mode.clone();
+                        let current_challenge_id = current_challenge_id.clone();
+                        let challenge_result = challenge_result.clone();
 
                         let load_example = Callback::from(move |_: MouseEvent| {
                             // Reset CPU
                             cpu.set(WasmCpu::new());
                             assembly_output.set(None);
                             assembly_lines.set(Vec::new());
+
+                            // Exit challenge mode when loading an example
+                            challenge_mode.set(false);
+                            current_challenge_id.set(None);
+                            challenge_result.set(None);
 
                             // Load new code
                             program_code.set(code.clone());
