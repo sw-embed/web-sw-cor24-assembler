@@ -23,15 +23,16 @@ A browser-based educational emulator for the COR24 assembly architecture. Writte
 
 COR24 is a simplified 24-bit RISC architecture designed for teaching:
 
-- **8 General-Purpose Registers**: r0-r7 (24-bit)
+- **3 General-Purpose Registers**: r0, r1, r2 (24-bit)
+- **5 Special-Purpose Registers**:
   - r3 = fp (frame pointer)
   - r4 = sp (stack pointer)
-  - r5 = z (zero/condition)
+  - r5 = z (zero, for compare instructions)
   - r6 = iv (interrupt vector)
   - r7 = ir (interrupt return)
 - **Single Condition Flag**: C (set by compare instructions)
-- **64KB Address Space**: Byte-addressable memory
-- **Variable-Length Instructions**: 1-4 bytes
+- **16MB Address Space**: 24-bit byte-addressable memory
+- **Variable-Length Instructions**: 1, 2, or 4 bytes
 
 ### Supported Instructions
 

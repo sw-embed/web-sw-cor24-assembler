@@ -389,11 +389,11 @@ Rust assumes standard pointer widths (8/16/32/64 bits). 24-bit requires:
 
 ### 2. Limited Register Set
 
-Only 8 registers with several reserved:
+Only 3 general-purpose registers with 5 special-purpose:
 - `r0-r2`: General purpose
 - `fp (r3)`: Frame pointer
 - `sp (r4)`: Stack pointer
-- `z (r5)`: Zero register
+- `z (r5)`: Zero (for compare instructions)
 - `iv (r6)`: Interrupt vector
 - `ir (r7)`: Interrupt return
 
@@ -404,7 +404,7 @@ This means:
 
 ### 3. Variable-Length Instructions
 
-COR24 has 1-4 byte instructions:
+COR24 has 1, 2, or 4 byte instructions:
 - Complicates code size estimation
 - Branch offset calculations are tricky
 - May need multiple passes for correct offsets
@@ -416,9 +416,9 @@ Likely no hardware:
 - Divide (need software `__divsi3`, `__modsi3`)
 - Floating point (software or skip entirely)
 
-### 5. Small Address Space
+### 5. Address Space Considerations
 
-64KB addressable memory:
+16MB addressable memory (24-bit):
 - Stack size limits
 - No large allocations
 - Memory-mapped I/O considerations

@@ -538,7 +538,7 @@ pub fn app() -> Html {
         },
         LegendItem {
             label: "z".to_string(),
-            value: "Zero Register (r5)".to_string(),
+            value: "Zero for comparisons (r5)".to_string(),
             changed: false,
         },
         LegendItem {
@@ -972,17 +972,18 @@ const TUTORIAL_CONTENT: &str = r#"
 
 <h4>CPU Features:</h4>
 <ul>
-    <li><strong>8 Registers (24-bit)</strong>: r0-r7 with special aliases</li>
-    <li><strong>64KB Memory</strong>: Byte-addressable, little-endian</li>
+    <li><strong>3 GP Registers (24-bit)</strong>: r0, r1, r2</li>
+    <li><strong>5 Special Registers</strong>: fp, sp, z, iv, ir</li>
+    <li><strong>16MB Memory</strong>: 24-bit addressable, little-endian</li>
     <li><strong>Single Condition Flag (C)</strong>: Set by compare instructions</li>
-    <li><strong>Variable-length Instructions</strong>: 1-4 bytes</li>
+    <li><strong>Variable-length Instructions</strong>: 1, 2, or 4 bytes</li>
 </ul>
 
 <h4>Register Aliases:</h4>
 <ul>
     <li><code>fp (r3)</code> - Frame Pointer</li>
     <li><code>sp (r4)</code> - Stack Pointer</li>
-    <li><code>z (r5)</code> - Zero Register (always 0)</li>
+    <li><code>z (r5)</code> - Zero (for compare instructions)</li>
     <li><code>iv (r6)</code> - Interrupt Vector</li>
     <li><code>ir (r7)</code> - Interrupt Return</li>
 </ul>

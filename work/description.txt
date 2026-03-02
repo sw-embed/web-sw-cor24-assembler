@@ -65,15 +65,16 @@ COR24 Architecture Summary
 --------------------------
 
 - 24-bit RISC architecture designed for C language support
-- 8 general-purpose registers (r0-r7, 24-bit each)
+- 3 general-purpose registers (r0, r1, r2, 24-bit each)
+- 5 special-purpose registers:
   - r3 = fp (frame pointer)
   - r4 = sp (stack pointer)
-  - r5 = z (zero register)
+  - r5 = z (zero, for compare instructions)
   - r6 = iv (interrupt vector)
   - r7 = ir (interrupt return)
 - Single condition flag (C) set by compare instructions
-- 64KB byte-addressable memory (little-endian)
-- Variable-length instructions (1-4 bytes)
+- 16MB byte-addressable memory (24-bit, little-endian)
+- Variable-length instructions (1, 2, or 4 bytes)
 - 211 valid instruction encodings
 
 Unique COR24 Features:

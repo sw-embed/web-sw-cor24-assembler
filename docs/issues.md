@@ -70,12 +70,12 @@ Currently using pre-built examples (LED Blink, Add Function) until server infras
 ### Memory Viewer
 
 - Only shows first 128 bytes
-- No scrolling to view full 64KB
+- No scrolling to view full 16MB address space
 - No memory editing capability
 
 ### Registers Panel
 
-- Shows all 8 registers but special register visualization could be improved
+- Shows all registers but special register visualization could be improved
 - Condition flag (C) shown in legend, could be more prominent
 
 ## Build/Deployment

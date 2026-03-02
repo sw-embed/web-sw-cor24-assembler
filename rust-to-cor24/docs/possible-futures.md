@@ -196,8 +196,8 @@ COR24 Assembly
 
 ### Architecture Constraints
 - **24-bit words** - Non-standard, requires masking from 32-bit
-- **8 registers** - Heavy stack spilling needed
-- **64KB memory** - Small address space
+- **3 GP registers** - Heavy stack spilling needed (r0-r2 only)
+- **16MB memory** - 24-bit address space
 - **No hardware multiply/divide** - Need software implementations
 
 ### Reserved Registers

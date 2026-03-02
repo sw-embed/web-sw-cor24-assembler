@@ -128,7 +128,7 @@ end_0:
 
 **Memory mapping:**
 ```
-COR24 Address Space (64KB):
+COR24 Emulation Layout (64KB subset of 16MB):
 0x0000 - 0x00FF: Reserved (vectors, etc.)
 0x0100 - 0x7FFF: WASM linear memory (32KB)
 0x8000 - 0xFEFF: Stack (grows down)

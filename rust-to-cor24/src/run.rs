@@ -24,11 +24,12 @@ const DEFAULT_SPEED: u64 = 100_000;
 const DEFAULT_TIME_LIMIT: f64 = 10.0;
 
 /// Minimal COR24 CPU state
+/// Note: Uses 64KB memory for emulation (subset of full 16MB address space)
 struct Cpu {
     pc: u32,
     regs: [u32; 8],
     c: bool,
-    mem: Vec<u8>,
+    mem: Vec<u8>, // 64KB emulation subset
     halted: bool,
     leds: u8,
     prev_leds: u8,

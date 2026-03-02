@@ -7,9 +7,11 @@ C-Oriented RISC 24-bit Instruction Set Architecture
 COR24 is a 24-bit RISC architecture designed for efficient C code execution. It features:
 
 - **24-bit data path** - Registers and addresses are 24 bits wide
-- **8 general-purpose registers** - r0 through r7
+- **3 general-purpose registers** - r0, r1, r2
+- **5 special-purpose registers** - fp, sp, z, iv, ir
 - **Single condition flag** - C (carry/condition)
-- **Variable-length instructions** - 1 to 4 bytes
+- **Variable-length instructions** - 1, 2, or 4 bytes
+- **16MB address space** - Full 24-bit addressing
 - **Little-endian** byte ordering
 - **Memory-mapped I/O**
 
@@ -22,7 +24,7 @@ COR24 is a 24-bit RISC architecture designed for efficient C code execution. It 
 | r2 | - | General purpose |
 | r3 | fp | Frame pointer |
 | r4 | sp | Stack pointer |
-| r5 | z | Zero register (for comparisons) |
+| r5 | z | Zero (for compare instructions) |
 | r6 | - | Interrupt vector |
 | r7 | - | Used for absolute jumps |
 | PC | - | Program counter (24-bit) |

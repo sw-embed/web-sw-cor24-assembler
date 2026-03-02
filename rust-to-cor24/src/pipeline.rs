@@ -14,11 +14,12 @@ use std::process::Command;
 const IO_LEDSWDAT: u32 = 0xFF0000;
 
 /// Minimal COR24 CPU state
+/// Note: Uses 64KB memory for emulation (subset of full 16MB address space)
 pub struct Cpu {
     pc: u32,
     regs: [u32; 8],
     c: bool,
-    mem: Vec<u8>,
+    mem: Vec<u8>, // 64KB emulation subset
     halted: bool,
     pub leds: u8,
     prev_leds: u8,

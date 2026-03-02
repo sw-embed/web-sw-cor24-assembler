@@ -2,7 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Memory size: 64KB for emulation (addresses 0x000000-0x00FFFF)
+/// Memory size: 64KB emulation subset of full 16MB (24-bit) address space
+/// Emulates addresses 0x000000-0x00FFFF
 pub const MEMORY_SIZE: usize = 65536;
 
 /// Default reset address (embedded block RAM start)
