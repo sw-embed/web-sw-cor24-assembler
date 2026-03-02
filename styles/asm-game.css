@@ -1258,6 +1258,629 @@ header h1 {
     flex-direction: column;
 }
 
+/* Full-width mode for Rust wizard - no margin for sidebar */
+.rust-tab-content.full-width {
+    margin-left: 0;
+}
+
 .rust-tab-content.hidden {
     display: none;
+}
+
+/* =============================================================================
+   Rust Pipeline Wizard Layout - 3-Column Design
+   ============================================================================= */
+
+.rust-wizard-layout {
+    display: grid;
+    grid-template-columns: 160px 160px 1fr;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Column 1: Sidebar with buttons and peripherals */
+.wizard-sidebar {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    background: #1a1a2e;
+    border-right: 1px solid #3d2e6b;
+}
+
+.wizard-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.wizard-buttons button {
+    width: 100%;
+    padding: 10px 12px;
+    background: #2d1f4e;
+    color: #c792ea;
+    border: 1px solid #3d2e6b;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.8em;
+    transition: all 0.2s;
+}
+
+.wizard-buttons button:hover {
+    background: #3d2e6b;
+    border-color: #c792ea;
+}
+
+.wizard-peripherals {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #3d2e6b;
+}
+
+.peripheral-section {
+    margin-bottom: 16px;
+}
+
+.peripheral-label {
+    color: #c792ea;
+    font-size: 0.75em;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.led-row-vertical {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+}
+
+.led-hex {
+    text-align: center;
+    color: #0f0;
+    font-family: 'Monaco', monospace;
+    font-size: 0.75em;
+    margin-top: 6px;
+}
+
+.peripheral-status {
+    color: #666;
+    font-size: 0.7em;
+    font-style: italic;
+}
+
+/* Column 2: Wizard steps */
+.wizard-steps {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    background: #1e1836;
+    border-right: 1px solid #3d2e6b;
+}
+
+.wizard-header-space {
+    height: 12px;
+}
+
+.wizard-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    cursor: default;
+    transition: all 0.2s;
+}
+
+.wizard-step.active {
+    background: #2d1f4e;
+    border: 1px solid #c792ea;
+}
+
+.wizard-step.completed {
+    cursor: pointer;
+}
+
+.wizard-step.completed:hover {
+    background: rgba(199, 146, 234, 0.1);
+}
+
+.wizard-step.completed .step-indicator {
+    color: #4caf50;
+}
+
+.wizard-step.disabled {
+    opacity: 0.4;
+}
+
+.step-indicator {
+    font-size: 1em;
+    width: 20px;
+    text-align: center;
+    color: #c792ea;
+}
+
+.step-label {
+    color: #eee;
+    font-size: 0.85em;
+}
+
+.wizard-action-btn {
+    margin-top: 16px;
+    padding: 10px 16px;
+    background: #7c3aed;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: all 0.2s;
+    animation: wizard-btn-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes wizard-btn-glow {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(167, 139, 250, 0.7), 0 0 20px rgba(124, 58, 237, 0.5);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 25px rgba(167, 139, 250, 1), 0 0 50px rgba(124, 58, 237, 0.9), 0 0 80px rgba(124, 58, 237, 0.6);
+        transform: scale(1.03);
+    }
+}
+
+.wizard-action-btn:hover {
+    background: #6d28d9;
+    /* Keep animation running on hover */
+}
+
+.wizard-reset-btn {
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.wizard-reset-btn:hover {
+    background: #b91c1c;
+}
+
+/* Column 3: Notebook cells */
+.notebook-cells {
+    overflow-y: auto;
+    padding: 12px;
+    padding-bottom: calc(100vh - 150px); /* Allow any cell to scroll to top */
+    scroll-behavior: smooth;
+    background: #1a1a2e;
+}
+
+/* Notebook placeholder when no example loaded */
+.notebook-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    background: #1e1836;
+    border-radius: 5px;
+    border: 2px dashed #3d2e6b;
+    color: #888;
+    font-size: 1em;
+}
+
+.notebook-cell {
+    background: #1e1836;
+    border-radius: 5px;
+    margin-bottom: 12px;
+    border: 1px solid #3d2e6b;
+    overflow: hidden;
+}
+
+.notebook-cell.collapsed {
+    display: none;
+}
+
+.notebook-cell.minimized {
+    max-height: 50px;
+}
+
+.cell-header {
+    padding: 10px 12px;
+    background: #2d1f4e;
+    color: #c792ea;
+    font-weight: bold;
+    font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cell-badge {
+    background: #3d2e6b;
+    color: #888;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75em;
+    font-weight: normal;
+}
+
+.cell-content {
+    padding: 12px;
+}
+
+/* Code blocks in notebook cells - purple theme */
+.rust-wizard-layout .code-block {
+    background: #12101f;
+    border: 1px solid #3d2e6b;
+}
+
+.rust-wizard-layout .rust-code {
+    color: #f8a5c2;
+}
+
+.rust-wizard-layout .asm-code {
+    color: #a5d6a7;
+}
+
+.rust-wizard-layout .hex-dump {
+    color: #888;
+}
+
+.rust-wizard-layout .wasm-disasm {
+    color: #ffcc80;
+}
+
+/* Debug panel - horizontal split */
+.debug-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.debug-controls {
+    padding: 12px;
+    border-bottom: 1px solid #3d2e6b;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.debug-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 12px;
+}
+
+.debug-left, .debug-right {
+    display: flex;
+    flex-direction: column;
+}
+
+.debug-left h4, .debug-right h4 {
+    color: #c792ea;
+    font-size: 0.8em;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #3d2e6b;
+}
+
+.debug-left .listing-scroll {
+    position: relative; /* Required for offsetTop calculation in auto-scroll */
+    background: #12101f;
+    border-radius: 3px;
+    padding: 8px;
+    min-height: 600px;
+    max-height: 750px;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+}
+
+/* Ensure listing scroll container doesn't cause parent scroll */
+.debug-left {
+    overflow: hidden;
+}
+
+/* Make the debug cell taller to fill viewport */
+.notebook-cell-debug .debug-panel {
+    min-height: 850px;
+}
+
+.notebook-cell-debug .debug-content {
+    min-height: 780px;
+}
+
+.debug-right .register-grid-compact {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    background: #12101f;
+    padding: 8px;
+    border-radius: 3px;
+}
+
+.register-row-compact {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 6px;
+    background: #1e1836;
+    border-radius: 2px;
+}
+
+.register-row-compact .reg-name {
+    color: #c792ea;
+    font-weight: bold;
+    font-size: 0.7em;
+}
+
+.register-row-compact .reg-value {
+    color: #a5d6a7;
+    font-family: 'Monaco', monospace;
+    font-size: 0.7em;
+}
+
+.cycle-info {
+    margin-top: 8px;
+    padding: 6px 8px;
+    background: #12101f;
+    border-radius: 3px;
+    color: #888;
+    font-size: 0.75em;
+}
+
+.memory-section {
+    margin-top: 12px;
+}
+
+.memory-section h4 {
+    color: #c792ea;
+    font-size: 0.75em;
+    margin-bottom: 6px;
+}
+
+.memory-dump-compact {
+    background: #12101f;
+    padding: 8px;
+    border-radius: 3px;
+    font-family: 'Monaco', monospace;
+    font-size: 0.65em;
+    color: #888;
+    max-height: 280px;
+    overflow-y: auto;
+    margin: 0;
+}
+
+/* Purple-themed buttons in wizard */
+.rust-wizard-layout .load-btn {
+    background: #2d1f4e;
+    color: #c792ea;
+    border: 1px solid #3d2e6b;
+}
+
+.rust-wizard-layout .load-btn:hover:not(:disabled) {
+    background: #c792ea;
+    color: #1e1836;
+}
+
+.rust-wizard-layout .step-btn {
+    background: #7c3aed;
+    color: white;
+    animation: step-btn-glow 3s ease-in-out infinite;
+}
+
+@keyframes step-btn-glow {
+    0%, 45%, 100% {
+        box-shadow: 0 0 8px rgba(124, 58, 237, 0.5);
+        transform: scale(1);
+    }
+    20% {
+        box-shadow: 0 0 20px rgba(167, 139, 250, 1), 0 0 40px rgba(124, 58, 237, 0.8);
+        transform: scale(1.02);
+    }
+}
+
+.rust-wizard-layout .step-btn:hover:not(:disabled) {
+    background: #6d28d9;
+}
+
+.rust-wizard-layout .step-btn:disabled {
+    animation: none;
+}
+
+.rust-wizard-layout .run-btn {
+    background: #059669;
+    color: white;
+    animation: run-btn-glow 3s ease-in-out infinite;
+    animation-delay: 1.5s; /* Offset from step button */
+}
+
+@keyframes run-btn-glow {
+    0%, 45%, 100% {
+        box-shadow: 0 0 8px rgba(5, 150, 105, 0.5);
+        transform: scale(1);
+    }
+    20% {
+        box-shadow: 0 0 20px rgba(52, 211, 153, 1), 0 0 40px rgba(5, 150, 105, 0.8);
+        transform: scale(1.02);
+    }
+}
+
+.rust-wizard-layout .run-btn:disabled {
+    animation: none;
+}
+
+.rust-wizard-layout .run-btn:hover:not(:disabled) {
+    background: #047857;
+}
+
+.rust-wizard-layout .reset-btn {
+    background: #dc2626;
+    color: white;
+}
+
+.rust-wizard-layout .reset-btn:hover:not(:disabled) {
+    background: #b91c1c;
+}
+
+.rust-wizard-layout .status-halted {
+    color: #dc2626;
+    font-weight: bold;
+    font-size: 0.85em;
+    margin-left: auto;
+}
+
+/* Current line in assembly listing - purple theme */
+.rust-wizard-layout .asm-line.current-line {
+    background: #7c3aed;
+    color: white;
+    font-weight: bold;
+    border-radius: 2px;
+}
+
+/* Pipeline note at bottom */
+.rust-wizard-layout .pipeline-note {
+    text-align: center;
+    color: #555;
+    font-size: 0.75em;
+    padding: 16px;
+    margin-top: 8px;
+}
+
+/* =============================================================================
+   Wizard Dialog (Load Example popup)
+   ============================================================================= */
+
+.wizard-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.wizard-dialog {
+    background: #1e1836;
+    border: 2px solid #7c3aed;
+    border-radius: 8px;
+    min-width: 400px;
+    max-width: 500px;
+    box-shadow: 0 10px 40px rgba(124, 58, 237, 0.3);
+}
+
+.wizard-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #3d2e6b;
+}
+
+.wizard-dialog-header h3 {
+    color: #c792ea;
+    font-size: 1.1em;
+    margin: 0;
+}
+
+.wizard-dialog-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 1.5em;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.wizard-dialog-close:hover {
+    background: #3d2e6b;
+    color: #c792ea;
+}
+
+.wizard-dialog-body {
+    padding: 20px;
+}
+
+.wizard-dialog-body label {
+    display: block;
+    color: #888;
+    font-size: 0.9em;
+    margin-bottom: 10px;
+}
+
+.wizard-dialog-select {
+    width: 100%;
+    padding: 12px;
+    background: #2d1f4e;
+    color: #eee;
+    border: 1px solid #3d2e6b;
+    border-radius: 4px;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.wizard-dialog-select:focus {
+    outline: none;
+    border-color: #7c3aed;
+}
+
+.wizard-dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid #3d2e6b;
+}
+
+.wizard-dialog-cancel {
+    padding: 10px 20px;
+    background: transparent;
+    color: #888;
+    border: 1px solid #3d2e6b;
+    border-radius: 4px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.wizard-dialog-cancel:hover {
+    background: #3d2e6b;
+    color: #c792ea;
+}
+
+.wizard-dialog-load {
+    padding: 10px 24px;
+    background: #7c3aed;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.wizard-dialog-load:hover:not(:disabled) {
+    background: #6d28d9;
+}
+
+.wizard-dialog-load:disabled {
+    background: #555;
+    cursor: not-allowed;
 }

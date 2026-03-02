@@ -418,6 +418,16 @@ pub fn app() -> Html {
         })
     };
 
+    // Rust pipeline: Unload (clear loaded state)
+    let on_rust_unload = {
+        let rust_is_loaded = rust_is_loaded.clone();
+        let rust_loaded_example = rust_loaded_example.clone();
+        Callback::from(move |()| {
+            rust_is_loaded.set(false);
+            rust_loaded_example.set(None);
+        })
+    };
+
     // Tab definitions
     let tabs = vec![
         Tab { id: "assembler".to_string(), label: "Assembler".to_string() },
@@ -490,7 +500,10 @@ pub fn app() -> Html {
                 <TabBar tabs={tabs} active_tab={(*active_tab).clone()} on_tab_change={on_tab_change} />
             </Header>
 
-            <Sidebar buttons={sidebar_buttons} />
+            // Only show main sidebar on Assembler tab
+            if *active_tab == "assembler" {
+                <Sidebar buttons={sidebar_buttons} />
+            }
 
             // Assembler Tab Content
             <div class={if *active_tab == "assembler" { "main-content" } else { "main-content hidden" }}>
@@ -621,17 +634,34 @@ pub fn app() -> Html {
                 </div>
             </div>
 
-            // Rust Pipeline Tab Content
-            <div class={if *active_tab == "rust" { "rust-tab-content" } else { "rust-tab-content hidden" }}>
+            // Rust Pipeline Tab Content - Full width wizard layout
+            <div class={if *active_tab == "rust" { "rust-tab-content full-width" } else { "rust-tab-content hidden" }}>
                 <RustPipeline
                     examples={rust_examples}
                     on_load={on_rust_load}
                     on_step={on_rust_step}
                     on_run={on_rust_run}
                     on_reset={on_rust_reset}
+                    on_unload={on_rust_unload}
                     cpu_state={(*rust_cpu_state).clone()}
                     is_loaded={*rust_is_loaded}
                     is_running={*rust_is_running}
+                    on_tutorial_open={
+                        let tutorial_open = tutorial_open.clone();
+                        Callback::from(move |_| tutorial_open.set(true))
+                    }
+                    on_examples_open={
+                        let examples_open = examples_open.clone();
+                        Callback::from(move |_| examples_open.set(true))
+                    }
+                    on_isa_ref_open={
+                        let isa_ref_open = isa_ref_open.clone();
+                        Callback::from(move |_| isa_ref_open.set(true))
+                    }
+                    on_help_open={
+                        let help_open = help_open.clone();
+                        Callback::from(move |_| help_open.set(true))
+                    }
                 />
             </div>
 
