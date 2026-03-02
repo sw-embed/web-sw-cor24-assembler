@@ -38,6 +38,8 @@ pub fn app() -> Html {
     let asm_is_running = use_state(|| false);
     // Use Rc<Cell> for stop flag - provides immediate visibility across closures
     let asm_stop_requested = use_mut_ref(|| Rc::new(Cell::new(false)));
+    // Use Rc<Cell> for switch state during run - avoids race with cpu_handle updates
+    let shared_switches = use_mut_ref(|| Rc::new(Cell::new(0u8)));
 
     // Modal states
     let tutorial_open = use_state(|| false);
@@ -185,16 +187,21 @@ pub fn app() -> Html {
         let assembly_output = assembly_output.clone();
         let asm_is_running = asm_is_running.clone();
         let stop_flag = asm_stop_requested.borrow().clone();
+        let switches = shared_switches.borrow().clone();
 
         Callback::from(move |()| {
             // Start animated run
             asm_is_running.set(true);
             stop_flag.set(false);
 
+            // Initialize shared switch state from current CPU
+            switches.set((*cpu).get_switches());
+
             let cpu_handle = cpu.clone();
             let output_handle = assembly_output.clone();
             let running_handle = asm_is_running.clone();
             let stop_handle = stop_flag.clone();
+            let switch_handle = switches.clone();
             let current_cpu = (*cpu).clone();
 
             // Start the animated run loop
@@ -204,6 +211,7 @@ pub fn app() -> Html {
                 output_handle: yew::UseStateHandle<Option<Html>>,
                 running_handle: yew::UseStateHandle<bool>,
                 stop_handle: Rc<Cell<bool>>,
+                switch_handle: Rc<Cell<u8>>,
             ) {
                 // Check if stop was requested (immediate - no state delay)
                 if stop_handle.get() {
@@ -217,10 +225,8 @@ pub fn app() -> Html {
                     return;
                 }
 
-                // Sync switch state from UI (user may have toggled switches)
-                // IMPORTANT: Read this BEFORE executing so we see user's toggles
-                let ui_switches = (*cpu_handle).get_switches();
-                current_cpu.set_switches(ui_switches);
+                // Read switch state from shared Rc<Cell> (updated by switch onclick)
+                current_cpu.set_switches(switch_handle.get());
 
                 // Execute a small batch of instructions (small batch = responsive to input)
                 let mut halted = false;
@@ -238,10 +244,8 @@ pub fn app() -> Html {
                 }
 
                 // Update CPU state for UI refresh (includes LED state)
-                // IMPORTANT: Preserve UI switch state - don't overwrite user's toggles
-                // Re-read in case user toggled during execution
-                let final_switches = (*cpu_handle).get_switches();
-                current_cpu.set_switches(final_switches);
+                // Preserve switch state from shared cell
+                current_cpu.set_switches(switch_handle.get());
                 cpu_handle.set(current_cpu.clone());
 
                 if halted {
@@ -262,14 +266,14 @@ pub fn app() -> Html {
                 } else {
                     // Continue running - 50ms delay allows browser to process input events
                     gloo::timers::callback::Timeout::new(50, move || {
-                        run_step(current_cpu, cpu_handle, output_handle, running_handle, stop_handle);
+                        run_step(current_cpu, cpu_handle, output_handle, running_handle, stop_handle, switch_handle);
                     }).forget();
                 }
             }
 
             // Start the first step
             gloo::timers::callback::Timeout::new(0, move || {
-                run_step(current_cpu, cpu_handle, output_handle, running_handle, stop_handle);
+                run_step(current_cpu, cpu_handle, output_handle, running_handle, stop_handle, switch_handle);
             }).forget();
         })
     };
@@ -764,7 +768,12 @@ pub fn app() -> Html {
                                     let switch_on = ((*cpu).get_switches() >> i) & 1 == 1;
                                     let class = if switch_on { "switch switch-on" } else { "switch switch-off" };
                                     let cpu = cpu.clone();
+                                    let switches = shared_switches.borrow().clone();
                                     let onclick = Callback::from(move |_| {
+                                        // Toggle in shared state (for run loop)
+                                        let old_val = switches.get();
+                                        switches.set(old_val ^ (1 << i));
+                                        // Also toggle in CPU state (for UI display)
                                         let mut new_cpu = (*cpu).clone();
                                         new_cpu.toggle_switch(i);
                                         cpu.set(new_cpu);
