@@ -213,10 +213,10 @@ pub fn app() -> Html {
                     return;
                 }
 
-                // Execute a batch of instructions
+                // Execute a small batch of instructions (small batch = responsive to input)
                 let mut halted = false;
                 let mut error_msg = None;
-                for _ in 0..100 {
+                for _ in 0..10 {
                     if current_cpu.is_halted() {
                         halted = true;
                         break;
@@ -247,8 +247,8 @@ pub fn app() -> Html {
                         }));
                     }
                 } else {
-                    // Continue running - schedule next batch
-                    gloo::timers::callback::Timeout::new(16, move || {
+                    // Continue running - 50ms delay allows browser to process input events
+                    gloo::timers::callback::Timeout::new(50, move || {
                         run_step(current_cpu, cpu_handle, output_handle, running_handle, stop_handle);
                     }).forget();
                 }
