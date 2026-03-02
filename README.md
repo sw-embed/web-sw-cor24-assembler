@@ -4,7 +4,11 @@ A browser-based educational emulator for the COR24 (C-Oriented RISC 24-bit) asse
 
 **[Live Demo](https://sw-embed.github.io/cor24-rs/)**
 
-![COR24 Emulator Interface](images/cor24-interface-2026-02-26T05-07-30-868Z.png)
+### Assembler Tab
+![COR24 Assembler Interface](images/assembler-tab-2026-03-02T05-59-39-580Z.png?ts=1772431267457)
+
+### Rust Tab
+![COR24 Rust Pipeline Interface](images/rust-tab-2026-03-02T05-59-46-576Z.png?ts=1772431267457)
 
 ## Features
 
@@ -105,3 +109,9 @@ MIT License - see [LICENSE](LICENSE)
 
 - COR24 architecture designed for embedded systems education
 - Decode ROM extracted from original hardware Verilog
+
+## References
+
+- [MakerLisp - COR24 Homepage](https://www.makerlisp.com/)
+- [COR24 Soft CPU for FPGA](https://www.makerlisp.com/cor24-soft-cpu-for-fpga)
+- [COR24 Test Board](https://www.makerlisp.com/cor24-test-board)
