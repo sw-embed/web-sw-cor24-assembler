@@ -276,19 +276,20 @@ loop:
             .to_string(),
         ),
         (
-            "Switch Echo".to_string(),
-            "Read switches and display on LEDs.".to_string(),
-            r#"; Example 10: Switch Echo
-; Read switches and echo to LEDs
-; Toggle switches in the I/O panel, then Step to update LEDs
+            "Button Echo (blinky)".to_string(),
+            "LED D2 follows button S2 - matches COR24-TB hardware demo.".to_string(),
+            r#"; Example 10: Button Echo (blinky)
+; LED D2 follows button S2
+; Click S2 button in I/O panel while running
 ;
-; Like the reference blinky.c: *ledsw = *ledsw
+; Matches reference blinky.c: *ledsw = *ledsw
+; Hardware: S2 = bit 0 read, D2 = bit 0 write
 
         la      r1,0xFF0000 ; I/O address (LEDSWDAT)
 
 loop:
-        lb      r0,0(r1)    ; Read switches
-        sb      r0,0(r1)    ; Write to LEDs
+        lb      r0,0(r1)    ; Read button S2 (bit 0)
+        sb      r0,0(r1)    ; Write to LED D2 (bit 0)
 
         bra     loop        ; Keep polling
 

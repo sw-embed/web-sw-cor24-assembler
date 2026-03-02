@@ -23,6 +23,11 @@ pub fn app() -> Html {
     let rust_is_loaded = use_state(|| false);
     let rust_is_running = use_state(|| false);
     let rust_loaded_example = use_state(|| None::<RustExample>);
+    let rust_switch_value = use_state(|| 0u8);
+    // Use Rc<Cell> for immediate stop flag visibility in Rust pipeline
+    let rust_stop_requested = use_mut_ref(|| Rc::new(Cell::new(false)));
+    // Use Rc<Cell> for switch state during Rust run - avoids race with cpu_handle updates
+    let rust_shared_switches = use_mut_ref(|| Rc::new(Cell::new(0u8)));
 
     // State management
     let cpu = use_state(WasmCpu::new);
@@ -411,13 +416,20 @@ pub fn app() -> Html {
         })
     };
 
-    // Rust pipeline: Run to completion (or max cycles)
+    // Rust pipeline: Run with stop button and switch support
     let on_rust_run = {
         let rust_cpu = rust_cpu.clone();
         let rust_is_running = rust_is_running.clone();
         let rust_cpu_state = rust_cpu_state.clone();
+        let stop_flag = rust_stop_requested.clone();
+        let switch_state = rust_shared_switches.clone();
+        let switch_value = rust_switch_value.clone();
 
         Callback::from(move |()| {
+            // Clear stop flag and sync switch state
+            stop_flag.borrow().set(false);
+            switch_state.borrow().set(*switch_value);
+
             rust_is_running.set(true);
             let cpu_handle = rust_cpu.clone();
             let running = rust_is_running.clone();
@@ -430,6 +442,8 @@ pub fn app() -> Html {
             let prev_mem_high = (*state).memory_high.clone();
             let prev_prev_mem_low = (*state).prev_memory_low.clone();
             let prev_prev_mem_high = (*state).prev_memory_high.clone();
+            let stop_flag = Rc::clone(&stop_flag.borrow());
+            let switch_state = Rc::clone(&switch_state.borrow());
 
             // Run with animation using timer
             gloo::timers::callback::Timeout::new(50, move || {
@@ -447,7 +461,19 @@ pub fn app() -> Html {
                     prev_prev_mem_low: Vec<u8>,
                     prev_prev_mem_high: Vec<u8>,
                     steps: u32,
+                    stop_flag: Rc<Cell<bool>>,
+                    switch_state: Rc<Cell<u8>>,
                 ) {
+                    // Check stop flag
+                    if stop_flag.get() {
+                        cpu_handle.set(current_cpu);
+                        running.set(false);
+                        return;
+                    }
+
+                    // Sync switch state before execution
+                    current_cpu.set_switches(switch_state.get());
+
                     // Execute a batch of instructions
                     let mut halted = false;
                     for _ in 0..10 {
@@ -505,7 +531,7 @@ pub fn app() -> Html {
                         assembled_lines: asm_lines.clone(),
                     });
 
-                    if halted || steps > 1000 {
+                    if halted {
                         // Done - save final CPU state
                         cpu_handle.set(current_cpu);
                         running.set(false);
@@ -516,13 +542,37 @@ pub fn app() -> Html {
                         let state = state.clone();
                         let asm_lines = asm_lines.clone();
                         gloo::timers::callback::Timeout::new(30, move || {
-                            run_step(current_cpu, cpu_handle, running, state, asm_lines, next_prev_regs, next_prev_prev_regs, next_prev_mem_low, next_prev_mem_high, next_prev_prev_mem_low, next_prev_prev_mem_high, steps + 10);
+                            run_step(current_cpu, cpu_handle, running, state, asm_lines, next_prev_regs, next_prev_prev_regs, next_prev_mem_low, next_prev_mem_high, next_prev_prev_mem_low, next_prev_prev_mem_high, steps + 10, stop_flag, switch_state);
                         }).forget();
                     }
                 }
 
-                run_step(initial_cpu, cpu_handle, running, state, asm_lines, prev_regs, prev_prev_regs, prev_mem_low, prev_mem_high, prev_prev_mem_low, prev_prev_mem_high, 0);
+                run_step(initial_cpu, cpu_handle, running, state, asm_lines, prev_regs, prev_prev_regs, prev_mem_low, prev_mem_high, prev_prev_mem_low, prev_prev_mem_high, 0, stop_flag, switch_state);
             }).forget();
+        })
+    };
+
+    // Rust pipeline: Stop execution
+    let on_rust_stop = {
+        let stop_flag = rust_stop_requested.clone();
+        Callback::from(move |()| {
+            stop_flag.borrow().set(true);
+        })
+    };
+
+    // Rust pipeline: Toggle switch
+    let on_rust_switch_toggle = {
+        let rust_switch_value = rust_switch_value.clone();
+        let rust_cpu = rust_cpu.clone();
+        let switch_state = rust_shared_switches.clone();
+        Callback::from(move |new_value: u8| {
+            rust_switch_value.set(new_value);
+            // Update shared state for run loop
+            switch_state.borrow().set(new_value);
+            // Also update CPU directly for step mode
+            let mut cpu = (*rust_cpu).clone();
+            cpu.set_switches(new_value);
+            rust_cpu.set(cpu);
         })
     };
 
@@ -655,6 +705,29 @@ pub fn app() -> Html {
     // Pre-built Rust examples
     let rust_examples = get_rust_examples();
 
+    // Compute LED and switch values outside html! macro
+    let asm_led_on = ((*cpu).get_leds() & 1) == 1;
+    let asm_led_class = if asm_led_on { "led led-on led-large" } else { "led led-off led-large" };
+    let asm_led_status = if asm_led_on { "ON" } else { "OFF" };
+    let asm_button_pressed = ((*cpu).get_switches() & 1) == 1;
+    let asm_button_class = if asm_button_pressed { "switch switch-on switch-large" } else { "switch switch-off switch-large" };
+    let asm_button_status = if asm_button_pressed { "PRESSED" } else { "released" };
+
+    // Button toggle callback for assembler tab
+    let asm_button_onclick = {
+        let cpu = cpu.clone();
+        let switches = shared_switches.borrow().clone();
+        Callback::from(move |_: MouseEvent| {
+            // Toggle in shared state (for run loop)
+            let old_val = switches.get();
+            switches.set(old_val ^ 1);
+            // Also toggle in CPU state (for UI display)
+            let mut new_cpu = (*cpu).clone();
+            new_cpu.toggle_switch(0);
+            cpu.set(new_cpu);
+        })
+    };
+
     html! {
         <div class="container">
             <Header title="COR24 C-Oriented RISC, 24-bit - Assembly Emulator">
@@ -745,50 +818,27 @@ pub fn app() -> Html {
                         </div>
                     </div>
 
-                    // I/O Panel: LEDs and Switches (Collapsible)
+                    // I/O Panel: LED D2 and Button S2 (matches COR24-TB hardware)
                     <Collapsible title="I/O Peripherals" initially_open={true}>
                         <div class="io-section">
-                            <div class="io-label">{"LEDs (0xFF0000)"}</div>
+                            <div class="io-label">{"LED D2 (write bit 0 to 0xFF0000)"}</div>
                             <div class="led-row">
-                                {for (0..8).rev().map(|i| {
-                                    let led_on = ((*cpu).get_leds() >> i) & 1 == 1;
-                                    let class = if led_on { "led led-on" } else { "led led-off" };
-                                    html! {
-                                        <div class={class} title={format!("LED {}", i)}>
-                                            {i}
-                                        </div>
-                                    }
-                                })}
+                                <div class={asm_led_class} title="LED D2">
+                                    {"D2"}
+                                </div>
                             </div>
                         </div>
                         <div class="io-section">
-                            <div class="io-label">{"Switches (read from 0xFF0000)"}</div>
+                            <div class="io-label">{"Button S2 (read bit 0 from 0xFF0000)"}</div>
                             <div class="switch-row">
-                                {for (0..8).rev().map(|i| {
-                                    let switch_on = ((*cpu).get_switches() >> i) & 1 == 1;
-                                    let class = if switch_on { "switch switch-on" } else { "switch switch-off" };
-                                    let cpu = cpu.clone();
-                                    let switches = shared_switches.borrow().clone();
-                                    let onclick = Callback::from(move |_| {
-                                        // Toggle in shared state (for run loop)
-                                        let old_val = switches.get();
-                                        switches.set(old_val ^ (1 << i));
-                                        // Also toggle in CPU state (for UI display)
-                                        let mut new_cpu = (*cpu).clone();
-                                        new_cpu.toggle_switch(i);
-                                        cpu.set(new_cpu);
-                                    });
-                                    html! {
-                                        <div class={class} title={format!("Switch {}", i)} onclick={onclick}>
-                                            {i}
-                                        </div>
-                                    }
-                                })}
+                                <div class={asm_button_class} title="Button S2 (click to toggle)" onclick={asm_button_onclick}>
+                                    {"S2"}
+                                </div>
                             </div>
                         </div>
                         <div class="io-values">
-                            <span>{"LEDs: "}{format!("0x{:02X}", (*cpu).get_leds())}</span>
-                            <span>{"  SW: "}{format!("0x{:02X}", (*cpu).get_switches())}</span>
+                            <span>{"LED: "}{asm_led_status}</span>
+                            <span>{"  Button: "}{asm_button_status}</span>
                         </div>
                     </Collapsible>
 
@@ -810,11 +860,14 @@ pub fn app() -> Html {
                     on_load={on_rust_load}
                     on_step={on_rust_step}
                     on_run={on_rust_run}
+                    on_stop={on_rust_stop}
                     on_reset={on_rust_reset}
                     on_unload={on_rust_unload}
                     cpu_state={(*rust_cpu_state).clone()}
                     is_loaded={*rust_is_loaded}
                     is_running={*rust_is_running}
+                    switch_value={*rust_switch_value}
+                    on_switch_toggle={on_rust_switch_toggle}
                     on_tutorial_open={
                         let tutorial_open = tutorial_open.clone();
                         Callback::from(move |_| tutorial_open.set(true))
@@ -1399,6 +1452,55 @@ add_and_store:
 001D: 53           mov     sp, fp
 001E: 76           pop     fp
 001F: C7 00 00 00  halt"#.to_string(),
+        },
+        RustExample {
+            name: "Button Echo (blinky)".to_string(),
+            description: "LED D2 follows button S2 - matches COR24-TB hardware blinky demo".to_string(),
+            rust_source: r#"#![no_std]
+use core::panic::PanicInfo;
+
+#[panic_handler]
+fn panic(_: &PanicInfo) -> ! { loop {} }
+
+// Memory-mapped I/O address for LED/Button
+const LEDSWDAT: *mut u8 = 0xFF0000 as *mut u8;
+
+#[no_mangle]
+pub extern "C" fn button_echo() {
+    loop {
+        unsafe {
+            // Read button S2 (bit 0), write to LED D2 (bit 0)
+            *LEDSWDAT = *LEDSWDAT;
+        }
+    }
+}"#.to_string(),
+            wasm_hex: "Conceptual - hardware I/O not in WASM".to_string(),
+            wasm_size: 0,
+            wasm_disassembly: r#"; Button Echo cannot compile to WASM
+; (hardware I/O is platform-specific)
+; This shows the direct COR24 implementation"#.to_string(),
+            cor24_assembly: r#"; Button Echo (blinky) - LED D2 follows button S2
+; Matches COR24-TB hardware demo blinky.c
+; Click S2 button in I/O panel while running
+;
+; *LEDSWDAT = *LEDSWDAT (read button, write LED)
+
+button_echo:
+        la      r1, 0xFF0000    ; I/O address (LEDSWDAT)
+
+.loop:
+        lb      r0, 0(r1)       ; Read button S2 (bit 0)
+        sb      r0, 0(r1)       ; Write to LED D2 (bit 0)
+        bra     .loop           ; Keep polling
+
+        halt                    ; Never reached"#.to_string(),
+            machine_code_hex: "2900 00ff 2e00 8200 13f8 c700 0000".to_string(),
+            machine_code_size: 14,
+            listing: r#"0000: 29 00 00 FF  la      r1, 0xFF0000
+0004: 2E 00        lb      r0, 0(r1)
+0006: 82 00        sb      r0, 0(r1)
+0008: 13 F8        bra     .loop
+000A: C7 00 00 00  halt"#.to_string(),
         },
     ]
 }

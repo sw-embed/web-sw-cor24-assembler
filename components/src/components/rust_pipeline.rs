@@ -100,12 +100,15 @@ pub struct RustPipelineProps {
     pub on_load: Callback<RustExample>,
     pub on_step: Callback<()>,
     pub on_run: Callback<()>,
+    pub on_stop: Callback<()>,
     pub on_reset: Callback<()>,
     #[prop_or_default]
     pub on_unload: Callback<()>,
     pub cpu_state: RustCpuState,
     pub is_loaded: bool,
     pub is_running: bool,
+    pub switch_value: u8,
+    pub on_switch_toggle: Callback<u8>,
     // Modal callbacks - passed from app.rs
     #[prop_or_default]
     pub on_tutorial_open: Callback<()>,
@@ -306,12 +309,34 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
         Callback::from(move |_| on_run.emit(()))
     };
 
+    let on_stop_click = {
+        let on_stop = props.on_stop.clone();
+        Callback::from(move |_| on_stop.emit(()))
+    };
+
     let on_reset_click = {
         let on_reset = props.on_reset.clone();
         Callback::from(move |_| on_reset.emit(()))
     };
 
     let state = &props.cpu_state;
+
+    // Compute LED and switch values outside html! macro for cleaner parsing
+    let led_on = (state.led_value & 1) == 1;
+    let led_class = if led_on { "led led-on led-large" } else { "led led-off led-large" };
+    let led_status = if led_on { "ON" } else { "OFF" };
+    let switch_on = (props.switch_value & 1) == 1;
+    let switch_class = if switch_on { "switch switch-on switch-large" } else { "switch switch-off switch-large" };
+    let switch_status = if switch_on { "PRESSED" } else { "RELEASED" };
+
+    // Switch toggle callback
+    let on_switch_click = {
+        let on_switch_toggle = props.on_switch_toggle.clone();
+        let current_value = props.switch_value;
+        Callback::from(move |_: MouseEvent| {
+            on_switch_toggle.emit(current_value ^ 1);
+        })
+    };
 
     // All wizard steps for rendering
     let all_steps = [
@@ -345,28 +370,23 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                     }>{"Help"}</button>
                 </div>
 
-                // LEDs and peripherals at bottom
+                // LED D2 and Button S2 (matches COR24-TB hardware)
                 <div class="wizard-peripherals">
                     <div class="peripheral-section">
-                        <div class="peripheral-label">{"LEDs"}</div>
+                        <div class="peripheral-label">{"LED D2"}</div>
                         <div class="led-row-vertical">
-                            {for (0..8).rev().map(|i| {
-                                let led_on = (state.led_value >> i) & 1 == 1;
-                                let class = if led_on { "led led-on" } else { "led led-off" };
-                                html! {
-                                    <div class={class}>{i}</div>
-                                }
-                            })}
+                            <div class={led_class}>{"D2"}</div>
                         </div>
-                        <div class="led-hex">{format!("0x{:02X}", state.led_value)}</div>
+                        <div class="led-hex">{led_status}</div>
                     </div>
                     <div class="peripheral-section">
-                        <div class="peripheral-label">{"I2C"}</div>
-                        <div class="peripheral-status">{"(not connected)"}</div>
-                    </div>
-                    <div class="peripheral-section">
-                        <div class="peripheral-label">{"RTC"}</div>
-                        <div class="peripheral-status">{"--"}</div>
+                        <div class="peripheral-label">{"Button S2"}</div>
+                        <div class="switch-row-vertical">
+                            <div class={switch_class} onclick={on_switch_click} title="Click to toggle button S2">
+                                {"S2"}
+                            </div>
+                        </div>
+                        <div class="switch-hex">{switch_status}</div>
                     </div>
                 </div>
             </div>
@@ -473,10 +493,16 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                                         disabled={!props.is_loaded || state.is_halted || props.is_running}>
                                         {"Step"}
                                     </button>
-                                    <button class="run-btn" onclick={on_run_click.clone()}
-                                        disabled={!props.is_loaded || state.is_halted || props.is_running}>
-                                        {if props.is_running { "Running..." } else { "Run" }}
-                                    </button>
+                                    if props.is_running {
+                                        <button class="stop-btn" onclick={on_stop_click.clone()}>
+                                            {"Stop"}
+                                        </button>
+                                    } else {
+                                        <button class="run-btn" onclick={on_run_click.clone()}
+                                            disabled={!props.is_loaded || state.is_halted}>
+                                            {"Run"}
+                                        </button>
+                                    }
                                     <button class="reset-btn" onclick={on_reset_click.clone()}
                                         disabled={!props.is_loaded || props.is_running}>
                                         {"Reset"}
