@@ -14,6 +14,7 @@
 pub mod assembler;
 pub mod challenge;
 pub mod cpu;
+pub mod emulator;
 pub mod loader;
 
 // Yew app (only for wasm32 target)
@@ -30,4 +31,5 @@ pub use challenge::{Challenge, get_challenges, get_examples};
 pub use cpu::{
     CpuState, DecodeRom, ExecuteResult, Executor, INITIAL_SP, MEMORY_SIZE, RESET_ADDRESS,
 };
+pub use emulator::{BatchResult, CpuSnapshot, EmulatorCore, StopReason};
 pub use loader::{load_lgo, LoadResult};
