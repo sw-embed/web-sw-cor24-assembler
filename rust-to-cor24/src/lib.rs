@@ -4,7 +4,7 @@
 
 mod pipeline;
 
-pub use pipeline::{run_pipeline, Assembler, Cpu, print_leds};
+pub use pipeline::{run_pipeline, print_leds};
 
 use anyhow::Result;
 use wasmparser::{FuncType, Operator, Parser, Payload};
@@ -137,14 +137,12 @@ fn translate_function(
         let op = op?;
         match op {
             Operator::LocalGet { local_index } => {
-                // All locals are on the stack frame - load to expression register
                 let offset = local_index * 3;
                 code.push(format!("        lw      r{}, {}(fp)\n", stack_depth, offset));
                 stack_depth += 1;
             }
 
             Operator::LocalSet { local_index } => {
-                // All locals are on the stack frame - store from expression register
                 stack_depth -= 1;
                 let offset = local_index * 3;
                 code.push(format!("        sw      r{}, {}(fp)\n", stack_depth, offset));
@@ -256,7 +254,7 @@ fn translate_function(
         output.push_str(&line);
     }
 
-    // Epilogue (always, since we always have prologue)
+    // Epilogue
     output.push_str("        mov     sp, fp\n");
     output.push_str("        pop     fp\n");
     output.push_str("        halt\n\n");

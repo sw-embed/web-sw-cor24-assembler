@@ -10,6 +10,7 @@ exclude = ["examples/blink"]
 [dependencies]
 wasmparser = "0.121"
 anyhow = "1.0"
+cor24-emulator = { path = ".." }
 
 [[bin]]
 name = "wasm2cor24"

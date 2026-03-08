@@ -54,6 +54,7 @@ cor24-dbg --entry 0x93 docs/research/asld24/sieve.lgo
 | `print <reg\|addr>` | `p` | Print register or memory value |
 | `disas [addr] [N]` | | Disassemble N instructions |
 | `uart` | | Show UART output buffer |
+| `uart send <val>` | | Send byte to UART RX (decimal, 0xHH, or "string") |
 | `led` | | Show LED D2 and button S2 state |
 | `button [press\|release\|toggle]` | `btn` | Control button S2 |
 | `load <file.lgo>` | | Load a new LGO file |

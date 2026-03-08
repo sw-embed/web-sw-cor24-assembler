@@ -378,10 +378,22 @@ impl Debugger {
         }
     }
 
-    fn cmd_uart(&self, arg: &str) {
-        if arg.starts_with("send ") || arg.starts_with("tx ") {
-            // uart send <byte> — not yet wired up with mutable self
-            println!("Use 'uart send' outside of const context");
+    fn cmd_uart(&mut self, arg: &str) {
+        if let Some(rest) = arg.strip_prefix("send ").or_else(|| arg.strip_prefix("tx ")) {
+            let rest = rest.trim();
+            // Support: single char, decimal, 0x hex, or quoted string
+            if rest.starts_with('"') && rest.ends_with('"') && rest.len() >= 2 {
+                let s = &rest[1..rest.len()-1];
+                for b in s.bytes() {
+                    self.emu.send_uart_byte(b);
+                }
+                println!("Sent {} byte(s) to UART RX", s.len());
+            } else if let Some(byte) = parse_byte_value(rest) {
+                self.emu.send_uart_byte(byte);
+                println!("Sent 0x{:02X} ({}) to UART RX", byte, byte);
+            } else {
+                println!("Usage: uart send <byte|0xHH|\"string\">");
+            }
         } else {
             let output = self.emu.get_uart_output();
             println!("UART output buffer ({} chars):", output.len());
@@ -440,6 +452,7 @@ impl Debugger {
         println!("  disas [addr] [N]    Disassemble N instructions");
         println!("  load <file.lgo>     Load LGO file");
         println!("  uart                Show UART output buffer");
+        println!("  uart send <val>     Send byte to UART RX (decimal, 0xHH, or \"string\")");
         println!("  led                 Show LED/button state");
         println!("  button [press|release|toggle]  Control button S2");
         println!("  reset               Reset CPU");
@@ -470,6 +483,18 @@ impl Debugger {
         let s = self.emu.snapshot();
         println!("  r0={:06X} r1={:06X} r2={:06X} fp={:06X} sp={:06X} c={}",
             s.regs[0], s.regs[1], s.regs[2], s.regs[3], s.regs[4], s.c as u8);
+    }
+}
+
+fn parse_byte_value(s: &str) -> Option<u8> {
+    let s = s.trim();
+    if s.len() == 1 {
+        return Some(s.as_bytes()[0]);
+    }
+    if let Some(hex) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+        u8::from_str_radix(hex, 16).ok()
+    } else {
+        s.parse::<u8>().ok()
     }
 }
 
