@@ -200,6 +200,53 @@ cor24-dbg mytest.lgo
 | UART Data | 0xFF0100 | Read: RX data, Write: TX data |
 | UART Status | 0xFF0101 | bit0=RX ready, bit1=CTS, bit7=TX busy |
 
+## Demo Scripts
+
+Runnable demo scripts are in `scripts/`. Each builds the debugger and runs an
+example program non-interactively:
+
+| Script | What it demonstrates |
+|--------|---------------------|
+| `demo-cli-hello-world.sh` | UART string output, captures output into a shell variable |
+| `demo-cli-count-down.sh` | Breakpoints, single-stepping, register inspection |
+| `demo-cli-led-blink.sh` | LED toggling, UART output from a blink loop |
+| `demo-cli-sieve.sh` | Sieve benchmark (500M instructions), UART result |
+
+### Capturing UART output in a script
+
+The hello-world demo shows how to extract UART output into a shell variable
+for use in pipelines:
+
+```bash
+# Run the emulator and capture all output
+RAW_OUTPUT=$(cor24-dbg tests/programs/hello_world.lgo <<'CMDS'
+run 1000
+uart
+quit
+CMDS
+)
+
+# Extract the UART content between the header and the next prompt
+UART_OUTPUT=$(echo "$RAW_OUTPUT" | \
+  awk '/UART output buffer/{found=1; next} found && /[(]cor24[)]/{found=0} found && NF{print}')
+
+echo "$UART_OUTPUT"   # "Hello, World!"
+```
+
+## Test Programs
+
+Source and pre-assembled `.lgo` files live in `tests/programs/`:
+
+| Program | Description | Expected UART output |
+|---------|-------------|---------------------|
+| `hello_world.s` | String loop printing to UART | `Hello, World!\n` |
+| `hello_uart.s` | Inline character-by-character print | `Hi\n` |
+| `count_down.s` | Loop counting 5→1 with ASCII conversion | `54321` |
+| `led_blink.s` | Toggle LED D2 five times, print `L` each | `LLLLL` |
+| `led_on.s` | Write 1 to LED register | (LED on, no UART) |
+
+The sieve benchmark is at `docs/research/asld24/sieve.lgo` (entry point `0x93`).
+
 ## Tips
 
 - Use `step` then press Enter repeatedly to keep stepping (empty line = repeat)
