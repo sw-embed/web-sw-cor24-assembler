@@ -1,6 +1,8 @@
-# COR24 C-Oriented RISC, 24-bit - Assembly Emulator
+# MakerLisp COR24 — Assembly Emulator
 
-A browser-based educational emulator for the COR24 assembly architecture. Written in Rust and compiled to WebAssembly.
+A browser-based educational emulator for the
+[MakerLisp](https://makerlisp.com) COR24 (C-Oriented RISC, 24-bit)
+architecture. Written in Rust and compiled to WebAssembly.
 
 **[Live Demo](https://sw-embed.github.io/cor24-rs/)**
 
@@ -12,26 +14,30 @@ A browser-based educational emulator for the COR24 assembly architecture. Writte
 
 ## Features
 
-- **Interactive Assembly Editor** - Write and edit COR24 assembly code
-- **Step-by-Step Execution** - Debug your code instruction by instruction
-- **Register & Memory Viewer** - Watch CPU state change in real-time
-- **Built-in Examples** - Learn from pre-loaded example programs
-- **Challenges** - Test your assembly skills with programming challenges
-- **ISA Reference** - Complete instruction set documentation
+- **Interactive Assembly Editor** — Write and edit COR24 assembly code
+- **Step-by-Step Execution** — Debug your code instruction by instruction
+- **Multi-Region Memory Viewer** — Program, Stack, and I/O regions with change heatmaps
+- **CLI Debugger** (`cor24-dbg`) — GDB-like command-line debugger with breakpoints, UART, and LED/button I/O
+- **LGO File Loader** — Load programs assembled with the reference `as24` toolchain
+- **Built-in Examples** — Learn from pre-loaded example programs
+- **Challenges** — Test your assembly skills with programming challenges
+- **ISA Reference** — Instruction set documentation and memory map
 
 ## COR24 Architecture
 
-COR24 is a simplified 24-bit RISC architecture designed for teaching:
+COR24 is a 24-bit RISC soft CPU for Lattice MachXO FPGAs, designed for
+embedded systems education. 32 operations encode into 211 instruction
+forms (1, 2, or 4 bytes).
 
 - **3 General-Purpose Registers**: r0, r1, r2 (24-bit)
 - **5 Special-Purpose Registers**:
   - r3 = fp (frame pointer)
-  - r4 = sp (stack pointer)
-  - r5 = z (zero, for compare instructions)
+  - r4 = sp (stack pointer, init 0xFEEC00)
+  - r5 = z (always zero; usable only in compare instructions)
   - r6 = iv (interrupt vector)
-  - r7 = ir (interrupt return)
+  - r7 = ir (interrupt return address)
 - **Single Condition Flag**: C (set by compare instructions)
-- **16MB Address Space**: 24-bit byte-addressable memory
+- **16 MB Address Space**: 1 MB SRAM + 3 KB EBR (stack) + memory-mapped I/O
 - **Variable-Length Instructions**: 1, 2, or 4 bytes
 
 ### Supported Instructions
@@ -86,14 +92,19 @@ cor24-rs/
 │   │   ├── encode.rs      # Instruction encoding tables
 │   │   ├── executor.rs    # Instruction execution engine
 │   │   ├── instruction.rs # Opcode definitions
-│   │   └── state.rs       # CPU state management
+│   │   └── state.rs       # CPU state (registers, memory regions, I/O)
+│   ├── emulator.rs    # EmulatorCore — shared controller for CLI and Web
 │   ├── assembler.rs   # Two-pass assembler
+│   ├── loader.rs      # LGO file loader (as24 output format)
 │   ├── challenge.rs   # Challenge definitions
+│   ├── wasm.rs        # WASM bindings (WasmCpu wraps EmulatorCore)
 │   └── app.rs         # Yew web application
-├── components/        # Reusable UI components
+├── cli/               # CLI debugger (cor24-dbg)
+├── components/        # Reusable Yew UI components
+├── tests/programs/    # Assembly test programs (.s files)
+├── scripts/           # Demo and build scripts
 ├── styles/            # CSS stylesheets
-├── scripts/           # Build/extraction scripts
-└── references/        # Hardware reference files
+└── pages/             # Built WASM output (GitHub Pages)
 ```
 
 ## Testing
@@ -108,8 +119,9 @@ MIT License - see [LICENSE](LICENSE)
 
 ## Acknowledgments
 
-- COR24 architecture designed for embedded systems education
+- COR24 architecture by [MakerLisp](https://makerlisp.com) — designed for embedded systems education on Lattice MachXO FPGAs
 - Decode ROM extracted from original hardware Verilog
+- Reference assembler/linker (`as24`/`longlgo`) by Luther Johnson
 
 ## References
 

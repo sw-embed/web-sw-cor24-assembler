@@ -47,9 +47,12 @@ The remaining 45 invalid entries (0xD3-0xFF) are genuinely undefined in the hard
 
 ## CPU Execution
 
-### Halt Instruction
+### Halt Convention
 
-Currently `halt` is implemented as jumping to address 0, which relies on there being an infinite loop at that location. This matches the COR24-TB convention but may not be intuitive.
+~~Currently `halt` is implemented as jumping to address 0.~~ Fixed: COR24 has no halt
+instruction. All examples now use the standard idiom `halt: bra halt` (branch-to-self).
+The `halt` pseudo-instruction has been removed from the assembler since it is not
+supported by the reference `as24` toolchain.
 
 ### Interrupt Handling
 

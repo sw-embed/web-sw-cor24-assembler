@@ -1,7 +1,8 @@
-# COR24 CLI Emulator Guide
+# MakerLisp COR24 CLI Emulator Guide
 
 The `cor24-dbg` debugger lets you load, run, step through, and inspect
-COR24 programs assembled with the reference `as24` toolchain.
+[MakerLisp](https://makerlisp.com) COR24 programs assembled with the
+reference `as24` toolchain.
 
 ## Quick Start
 
@@ -193,7 +194,7 @@ cor24-dbg mytest.lgo
 | Region | Address Range | Description |
 |--------|---------------|-------------|
 | SRAM | 0x000000 - 0x0FFFFF | 1MB main memory |
-| EBR | 0xFEE000 - 0xFEFFFF | 8KB on-chip block RAM |
+| EBR | 0xFEE000 - 0xFEFFFF | 3 KB on MachXO (8 KB address range) |
 | Stack | grows down from 0xFEEC00 | Initial SP |
 | LED/Switch | 0xFF0000 | bit 0: LED D2 / button S2 |
 | Int Enable | 0xFF0010 | bit 0: UART RX interrupt |

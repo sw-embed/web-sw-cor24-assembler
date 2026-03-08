@@ -779,7 +779,7 @@ pub fn app() -> Html {
 
     html! {
         <div class="container">
-            <Header title="COR24 C-Oriented RISC, 24-bit - Assembly Emulator">
+            <Header title="MakerLisp COR24 — Assembly Emulator">
                 <TabBar tabs={tabs} active_tab={(*active_tab).clone()} on_tab_change={on_tab_change} />
             </Header>
 
@@ -1180,25 +1180,28 @@ const EXAMPLE_PROGRAM: &str = "; COR24 Example: Basic Arithmetic
 halt:   bra     halt        ; Done — infinite loop";
 
 const TUTORIAL_CONTENT: &str = r#"
-<h3>Welcome to the COR24 Assembly Emulator!</h3>
-<p>This emulator teaches you assembly programming using the COR24 C-Oriented RISC architecture.</p>
+<h3>MakerLisp COR24 Assembly Emulator</h3>
+<p>This emulator teaches you assembly programming using the
+<a href="https://makerlisp.com" target="_blank">MakerLisp</a> COR24
+C-Oriented RISC architecture — a 24-bit soft CPU targeting Lattice MachXO FPGAs.</p>
 
 <h4>CPU Features:</h4>
 <ul>
     <li><strong>3 GP Registers (24-bit)</strong>: r0, r1, r2</li>
-    <li><strong>5 Special Registers</strong>: fp, sp, z, iv, ir</li>
-    <li><strong>16MB Memory</strong>: 24-bit addressable, little-endian</li>
+    <li><strong>5 Special Registers</strong>: fp (r3), sp (r4), z (r5), iv (r6), ir (r7)</li>
+    <li><strong>32 Operations</strong>: Encoded into 211 instruction forms (1, 2, or 4 bytes)</li>
+    <li><strong>16 MB Address Space</strong>: 1 MB SRAM, 3 KB EBR (stack), memory-mapped I/O</li>
     <li><strong>Single Condition Flag (C)</strong>: Set by compare instructions</li>
-    <li><strong>Variable-length Instructions</strong>: 1, 2, or 4 bytes</li>
 </ul>
 
-<h4>Register Aliases:</h4>
+<h4>Registers:</h4>
 <ul>
+    <li><code>r0, r1, r2</code> - General purpose (24-bit)</li>
     <li><code>fp (r3)</code> - Frame Pointer</li>
-    <li><code>sp (r4)</code> - Stack Pointer</li>
-    <li><code>z (r5)</code> - Zero (for compare instructions)</li>
+    <li><code>sp (r4)</code> - Stack Pointer (init: 0xFEEC00)</li>
+    <li><code>z (r5)</code> - Always zero; only usable in compare instructions (e.g. <code>ceq r0,z</code>)</li>
     <li><code>iv (r6)</code> - Interrupt Vector</li>
-    <li><code>ir (r7)</code> - Interrupt Return</li>
+    <li><code>ir (r7)</code> - Interrupt Return address</li>
 </ul>
 
 <h4>Basic Instructions:</h4>
@@ -1219,6 +1222,8 @@ const TUTORIAL_CONTENT: &str = r#"
 
 const ISA_REF_CONTENT: &str = r#"
 <h3>COR24 Instruction Set Reference</h3>
+<p><em>32 operations &times; register fields = 211 instruction forms.
+See <a href="https://makerlisp.com" target="_blank">makerlisp.com</a> for the hardware specification.</em></p>
 
 <h4>Load Instructions</h4>
 <p><strong>lc ra,dd</strong> - Load Constant (signed 8-bit)</p>
@@ -1269,10 +1274,27 @@ const ISA_REF_CONTENT: &str = r#"
 <p><strong>jmp (ra)</strong> - Jump to address in ra</p>
 <p><strong>jal ra,(rb)</strong> - Jump and link (call)</p>
 
-<h4>Special</h4>
-<p><strong>halt: bra halt</strong> - Stop execution (branch-to-self infinite loop)</p>
+<h4>Extension Instructions</h4>
+<p><strong>sxt ra</strong> - Sign-extend byte to 24-bit word</p>
+<p><strong>zxt ra</strong> - Zero-extend byte to 24-bit word</p>
+
+<h4>Register Operations</h4>
 <p><strong>mov ra,rb</strong> - Copy register</p>
-<p><strong>mov ra,c</strong> - Move condition flag to register</p>
+<p><strong>mov ra,c</strong> - Move condition flag to register (0 or 1)</p>
+
+<h4>Idioms</h4>
+<p><strong>halt: bra halt</strong> - Stop execution (branch-to-self infinite loop)</p>
+<p><strong>nop</strong> - No operation (encoded as add r0,r0)</p>
+
+<h4>Memory Map</h4>
+<table style="font-size:0.85em">
+<tr><td><code>000000-0FFFFF</code></td><td>SRAM (1 MB)</td></tr>
+<tr><td><code>FEE000-FEFFFF</code></td><td>EBR — 3 KB on MachXO (8 KB address range)</td></tr>
+<tr><td><code>FEEC00</code></td><td>Initial SP (top of 3 KB EBR stack)</td></tr>
+<tr><td><code>FF0000</code></td><td>LED (write bit 0) / Button (read bit 0)</td></tr>
+<tr><td><code>FF0100</code></td><td>UART data</td></tr>
+<tr><td><code>FF0101</code></td><td>UART status (bit 0 = TX busy, bit 1 = RX ready)</td></tr>
+</table>
 "#;
 
 const HELP_CONTENT: &str = r#"
