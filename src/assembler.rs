@@ -614,9 +614,9 @@ impl Assembler {
 
         // Check if it's a label
         if let Some(&addr) = self.labels.get(target) {
-            // Calculate relative offset
-            let next_pc = self.address + 2;
-            let offset = (addr as i32) - (next_pc as i32);
+            // Calculate relative offset: COR24 pipeline means branch base = instr_addr + 4
+            let branch_base = self.address + 4;
+            let offset = (addr as i32) - (branch_base as i32);
             if !(-128..=127).contains(&offset) {
                 self.errors
                     .push(format!("Line {}: Branch target too far", line_num + 1));
@@ -860,8 +860,10 @@ impl Assembler {
                         }
                     }
                     RefType::Relative8 => {
-                        let next_pc = fref.address + 1;
-                        let offset = (target_addr as i32) - (next_pc as i32);
+                        // fref.address is the offset byte (instr_addr + 1)
+                        // branch_base = instr_addr + 4 = fref.address + 3
+                        let branch_base = fref.address + 3;
+                        let offset = (target_addr as i32) - (branch_base as i32);
                         if (-128..=127).contains(&offset) {
                             let addr = fref.address as usize;
                             if addr < self.output.len() {
@@ -1063,5 +1065,60 @@ mod tests {
 
         // Check LED value
         assert_eq!(cpu.io.leds, 0x55, "LED value should be 0x55, got 0x{:02X}", cpu.io.leds);
+    }
+
+    #[test]
+    fn test_branch_backward_label() {
+        // Backward branch: offset = target - (branch_instr_addr + 4)
+        // addr 0: lc r0,5    (2 bytes)
+        // addr 2: loop:
+        // addr 2: add r0,r0  (1 byte)
+        // addr 3: bra loop   (2 bytes) -> offset = 2 - (3+4) = -5
+        let mut asm = Assembler::new();
+        let result = asm.assemble("lc r0,5\nloop: add r0,r0\nbra loop");
+        assert!(result.errors.is_empty(), "Errors: {:?}", result.errors);
+        assert_eq!(result.bytes[3], 0x13); // bra
+        assert_eq!(result.bytes[4] as i8, -5); // offset = 2 - 7 = -5
+    }
+
+    #[test]
+    fn test_branch_forward_label() {
+        // Forward branch: offset = target - (branch_instr_addr + 4)
+        // addr 0: bra skip   (2 bytes) -> offset = 3 - (0+4) = -1
+        // addr 2: add r0,r0  (1 byte)
+        // addr 3: skip:
+        // addr 3: lc r0,1    (2 bytes)
+        let mut asm = Assembler::new();
+        let result = asm.assemble("bra skip\nadd r0,r0\nskip: lc r0,1");
+        assert!(result.errors.is_empty(), "Errors: {:?}", result.errors);
+        assert_eq!(result.bytes[0], 0x13); // bra
+        assert_eq!(result.bytes[1] as i8, -1); // offset = 3 - 4 = -1
+    }
+
+    #[test]
+    fn test_branch_loop_integration() {
+        use crate::cpu::{CpuState, Executor};
+
+        // Count down from 3 to 0 using branch loop:
+        //   lc r0,3          ; r0 = 3
+        // loop:
+        //   add r0,-1        ; r0 -= 1  (add imm with sign-extended 0xFF = -1)
+        //   ceq r0,z         ; compare r0 to zero
+        //   brf loop         ; if not equal, loop
+        let code = "lc r0,3\nloop: add r0,0xFF\nceq r0,z\nbrf loop";
+        let mut asm = Assembler::new();
+        let result = asm.assemble(code);
+        assert!(result.errors.is_empty(), "Assembly errors: {:?}", result.errors);
+
+        let mut cpu = CpuState::new();
+        cpu.load_program(0, &result.bytes);
+        let executor = Executor::new();
+
+        // Should run: lc, then 3 iterations of (add, ceq, brf), then fall through
+        // = 1 + 3*3 = 10 instructions, but brf not taken on last = still 10
+        executor.run(&mut cpu, 100);
+
+        assert_eq!(cpu.get_reg(0), 0, "r0 should be 0 after counting down");
+        assert!(cpu.c, "c flag should be true (r0 == z)");
     }
 }
