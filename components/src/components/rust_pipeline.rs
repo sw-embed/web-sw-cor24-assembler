@@ -1,5 +1,5 @@
 //! Rust Pipeline view component - Wizard-driven 3-column layout
-//! Shows the compilation pipeline: Rust -> WASM -> COR24 Assembly -> Machine Code -> Execution
+//! Shows the compilation pipeline: Rust -> MSP430 ASM -> COR24 ASM -> Machine Code -> Execution
 
 use wasm_bindgen::JsCast;
 use yew::prelude::*;
@@ -10,13 +10,8 @@ pub struct RustExample {
     pub name: String,
     pub description: String,
     pub rust_source: String,
-    pub wasm_hex: String,
-    pub wasm_size: usize,
-    pub wasm_disassembly: String,
+    pub msp430_asm: String,
     pub cor24_assembly: String,
-    pub machine_code_hex: String,
-    pub machine_code_size: usize,
-    pub listing: String,
 }
 
 /// CPU state for display in the Rust pipeline execution panel
@@ -48,11 +43,10 @@ pub struct RustCpuState {
 /// Wizard steps for progressive disclosure
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum WizardStep {
-    Source,    // Initial state - only Source visible
-    Compile,   // WASM binary revealed
-    Disasm,    // WASM disassembly revealed
-    Translate, // COR24 assembly revealed
-    Assemble,  // Debugger revealed
+    Source,    // Rust source code
+    Compile,   // MSP430 assembly output
+    Translate, // COR24 assembly output
+    Assemble,  // Assembled + debugger
 }
 
 impl WizardStep {
@@ -60,7 +54,6 @@ impl WizardStep {
         match self {
             WizardStep::Source => "Source",
             WizardStep::Compile => "Compile",
-            WizardStep::Disasm => "Disasm",
             WizardStep::Translate => "Translate",
             WizardStep::Assemble => "Assemble",
         }
@@ -69,8 +62,7 @@ impl WizardStep {
     fn next(&self) -> Option<WizardStep> {
         match self {
             WizardStep::Source => Some(WizardStep::Compile),
-            WizardStep::Compile => Some(WizardStep::Disasm),
-            WizardStep::Disasm => Some(WizardStep::Translate),
+            WizardStep::Compile => Some(WizardStep::Translate),
             WizardStep::Translate => Some(WizardStep::Assemble),
             WizardStep::Assemble => None,
         }
@@ -79,8 +71,7 @@ impl WizardStep {
     fn action_label(&self) -> &'static str {
         match self {
             WizardStep::Source => "Compile",
-            WizardStep::Compile => "Disassemble",
-            WizardStep::Disasm => "Translate",
+            WizardStep::Compile => "Translate",
             WizardStep::Translate => "Assemble",
             WizardStep::Assemble => "",
         }
@@ -89,8 +80,7 @@ impl WizardStep {
     fn cell_id(&self) -> &'static str {
         match self {
             WizardStep::Source => "cell-source",
-            WizardStep::Compile => "cell-wasm",
-            WizardStep::Disasm => "cell-disasm",
+            WizardStep::Compile => "cell-msp430",
             WizardStep::Translate => "cell-cor24",
             WizardStep::Assemble => "cell-debug",
         }
@@ -103,7 +93,7 @@ pub struct RustPipelineProps {
     #[prop_or_default]
     pub loaded_example: Option<RustExample>,
     pub on_load: Callback<RustExample>,
-    pub on_step: Callback<()>,
+    pub on_step: Callback<u32>,
     pub on_run: Callback<()>,
     pub on_stop: Callback<()>,
     pub on_reset: Callback<()>,
@@ -297,9 +287,24 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
     };
 
     // Execution callbacks
-    let on_step_click_exec = {
+    // Step count selector state
+    let step_count = use_state(|| 1u32);
+
+    let on_exec_step = {
         let on_step = props.on_step.clone();
-        Callback::from(move |_| on_step.emit(()))
+        let step_count = step_count.clone();
+        Callback::from(move |_: MouseEvent| on_step.emit(*step_count))
+    };
+
+    let on_step_count_change = {
+        let step_count = step_count.clone();
+        Callback::from(move |e: Event| {
+            if let Some(select) = e.target_dyn_into::<web_sys::HtmlSelectElement>()
+                && let Ok(n) = select.value().parse::<u32>()
+            {
+                step_count.set(n);
+            }
+        })
     };
 
     let on_run_click = {
@@ -318,6 +323,17 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
     };
 
     let state = &props.cpu_state;
+
+    // Compute emulator state label and CSS class
+    let (emu_state_label, emu_state_class) = if state.is_halted {
+        ("HALTED", "emu-state emu-halted")
+    } else if props.is_running {
+        ("RUNNING", "emu-state emu-running")
+    } else if state.instruction_count > 0 {
+        ("PAUSED", "emu-state emu-paused")
+    } else {
+        ("READY", "emu-state emu-ready")
+    };
 
     // Compute LED and switch values outside html! macro for cleaner parsing
     let led_on = (state.led_value & 1) == 1;
@@ -340,7 +356,6 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
     let all_steps = [
         WizardStep::Source,
         WizardStep::Compile,
-        WizardStep::Disasm,
         WizardStep::Translate,
         WizardStep::Assemble,
     ];
@@ -430,10 +445,15 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                     </button>
                 }
 
-                // Reset button - always enabled, red color
-                <button class="wizard-reset-btn" onclick={on_wizard_reset}>
-                    {"Reset"}
-                </button>
+                // Spacer to push Exit button to bottom
+                <div class="wizard-spacer"></div>
+
+                // Exit button - unloads example and returns to Source step
+                if props.is_loaded {
+                    <button class="wizard-exit-btn" onclick={on_wizard_reset}>
+                        {"Exit"}
+                    </button>
+                }
             </div>
 
             // Column 3: Notebook cells
@@ -441,39 +461,35 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                 if let Some(example) = &props.loaded_example {
                     // Cell 1: Rust Source (always visible)
                     <div class="notebook-cell" id="cell-source">
-                        <div class="cell-header">{"Rust Source"}</div>
+                        <div class="cell-header">
+                            <span>{"Rust Source"}</span>
+                            <span class="cell-header-example">{&example.name}</span>
+                        </div>
                         <div class="cell-content">
                             <pre class="code-block rust-code">{&example.rust_source}</pre>
                         </div>
                     </div>
 
-                    // Cell 2: WASM Binary (visible after Compile step)
+                    // Cell 2: MSP430 Assembly (visible after Compile step)
                     if *current_step >= WizardStep::Compile {
-                        <div class="notebook-cell" id="cell-wasm">
+                        <div class="notebook-cell" id="cell-msp430">
                             <div class="cell-header">
-                                <span>{"WASM Binary"}</span>
-                                <span class="cell-badge">{format!("{} bytes", example.wasm_size)}</span>
+                                <span>{"MSP430 Assembly"}</span>
+                                <span class="cell-header-example">{&example.name}</span>
                             </div>
                             <div class="cell-content">
-                                <pre class="code-block hex-dump">{&example.wasm_hex}</pre>
+                                <pre class="code-block asm-code">{&example.msp430_asm}</pre>
                             </div>
                         </div>
                     }
 
-                    // Cell 3: WASM Disassembly (visible after Disasm step)
-                    if *current_step >= WizardStep::Disasm {
-                        <div class="notebook-cell" id="cell-disasm">
-                            <div class="cell-header">{"WASM Disassembly"}</div>
-                            <div class="cell-content">
-                                <pre class="code-block wasm-disasm">{&example.wasm_disassembly}</pre>
-                            </div>
-                        </div>
-                    }
-
-                    // Cell 4: COR24 Assembly (visible after Translate step)
+                    // Cell 3: COR24 Assembly (visible after Translate step)
                     if *current_step >= WizardStep::Translate {
                         <div class="notebook-cell" id="cell-cor24">
-                            <div class="cell-header">{"COR24 Assembly"}</div>
+                            <div class="cell-header">
+                                <span>{"COR24 Assembly"}</span>
+                                <span class="cell-header-example">{&example.name}</span>
+                            </div>
                             <div class="cell-content">
                                 <pre class="code-block asm-code">{&example.cor24_assembly}</pre>
                             </div>
@@ -483,14 +499,27 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                     // Cell 5: Debug Panel (visible after Assemble step)
                     if *current_step >= WizardStep::Assemble {
                         <div class="notebook-cell notebook-cell-debug" id="cell-debug">
-                            <div class="cell-header">{"Execution"}</div>
+                            <div class="cell-header">
+                                <span>{"Execution"}</span>
+                                <span class="cell-header-example">{&example.name}</span>
+                            </div>
                             <div class="debug-panel">
                                 // Debug controls
                                 <div class="debug-controls">
-                                    <button class="step-btn" onclick={on_step_click_exec.clone()}
+                                    <span class="debug-controls-label">{"Emulator:"}</span>
+                                    <button class="step-btn" onclick={on_exec_step}
                                         disabled={!props.is_loaded || state.is_halted || props.is_running}>
                                         {"Step"}
                                     </button>
+                                    <select class="step-count-select" onchange={on_step_count_change}
+                                        disabled={props.is_running}>
+                                        <option value="1" selected={*step_count == 1}>{"×1"}</option>
+                                        <option value="10" selected={*step_count == 10}>{"×10"}</option>
+                                        <option value="100" selected={*step_count == 100}>{"×100"}</option>
+                                        <option value="1000" selected={*step_count == 1000}>{"×1K"}</option>
+                                        <option value="10000" selected={*step_count == 10000}>{"×10K"}</option>
+                                        <option value="100000" selected={*step_count == 100000}>{"×100K"}</option>
+                                    </select>
                                     if props.is_running {
                                         <button class="stop-btn" onclick={on_stop_click.clone()}>
                                             {"Stop"}
@@ -505,9 +534,6 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                                         disabled={!props.is_loaded || props.is_running}>
                                         {"Reset"}
                                     </button>
-                                    if state.is_halted {
-                                        <span class="status-halted">{"HALTED"}</span>
-                                    }
                                 </div>
 
                                 // Two-column debug content
@@ -541,19 +567,18 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                                         <h4>{"Registers"}</h4>
                                         <div class="register-grid-compact">
                                             {for (0..8).map(|i| {
-                                                let name = match i {
-                                                    0 => "r0",
-                                                    1 => "r1",
-                                                    2 => "r2",
-                                                    3 => "fp",
-                                                    4 => "sp",
-                                                    5 => "z",
-                                                    6 => "iv",
-                                                    7 => "ir",
-                                                    _ => "??",
+                                                let (name, tooltip) = match i {
+                                                    0 => ("r0", "General purpose register 0"),
+                                                    1 => ("r1", "General purpose register 1"),
+                                                    2 => ("r2", "General purpose register 2"),
+                                                    3 => ("fp", "Frame pointer (r3)"),
+                                                    4 => ("sp", "Stack pointer (r4)"),
+                                                    5 => ("z",  "Zero register (r5, always 0)"),
+                                                    6 => ("iv", "Interrupt vector (r6)"),
+                                                    7 => ("ir", "Interrupt return (r7)"),
+                                                    _ => ("??", ""),
                                                 };
                                                 let val = state.registers[i];
-                                                // Heat map: hot (just changed), warm (changed last step), cold (normal)
                                                 let is_hot = val != state.prev_registers[i];
                                                 let is_warm = !is_hot && state.prev_registers[i] != state.prev_prev_registers[i];
                                                 let row_class = if is_hot {
@@ -565,23 +590,24 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                                                 };
                                                 html! {
                                                     <div class={row_class}>
-                                                        <span class="reg-name">{name}</span>
+                                                        <span class="reg-name">{name}<span class="reg-tip" title={tooltip}>{"?"}</span></span>
                                                         <span class="reg-value">{format!("0x{:06X}", val)}</span>
                                                     </div>
                                                 }
                                             })}
                                             <div class="register-row-compact">
-                                                <span class="reg-name">{"PC"}</span>
+                                                <span class="reg-name">{"PC"}<span class="reg-tip" title="Program counter">{"?"}</span></span>
                                                 <span class="reg-value">{format!("0x{:06X}", state.pc)}</span>
                                             </div>
                                             <div class="register-row-compact">
-                                                <span class="reg-name">{"C"}</span>
+                                                <span class="reg-name">{"C"}<span class="reg-tip" title="Condition flag (set by compare instructions)">{"?"}</span></span>
                                                 <span class="reg-value">{if state.condition_flag { "1" } else { "0" }}</span>
                                             </div>
                                         </div>
 
-                                        <div class="cycle-info">
-                                            <span>{"Instructions: "}{state.instruction_count}</span>
+                                        <div class="emu-status-line">
+                                            <span class={emu_state_class}>{emu_state_label}</span>
+                                            <span class="instruction-count">{"Instructions: "}{state.instruction_count}</span>
                                         </div>
 
                                         // Memory viewer - three regions
@@ -593,9 +619,9 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                                                 }</div>
                                             </div>
                                             <div class="memory-section">
-                                                <h4>{format!("Stack (SP = 0x{:06X})", state.stack_base_addr)}</h4>
+                                                <h4>{format!("Stack (0xFEEC00 \u{2193} SP=0x{:06X})", state.registers[4])}</h4>
                                                 <div class="memory-dump-compact">{
-                                                    format_memory_dump_heatmap(&state.memory_stack, &state.prev_memory_stack, &state.prev_prev_memory_stack, state.stack_base_addr)
+                                                    format_memory_dump_reversed_heatmap(&state.memory_stack, &state.prev_memory_stack, &state.prev_prev_memory_stack, state.stack_base_addr)
                                                 }</div>
                                             </div>
                                             <div class="memory-section">
@@ -617,9 +643,9 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                     </div>
                 }
 
-                // Future: Server-side compilation notice
+                // Pipeline note
                 <div class="pipeline-note">
-                    <em>{"Note: Examples are pre-built. Server-side compilation coming soon."}</em>
+                    <em>{"Pipeline: Rust \u{2192} rustc (msp430-none-elf) \u{2192} MSP430 ASM \u{2192} COR24 ASM \u{2192} Machine Code. Examples are pre-built."}</em>
                 </div>
             </div>
 

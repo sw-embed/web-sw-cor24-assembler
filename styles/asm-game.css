@@ -1557,10 +1557,14 @@ header h1 {
     /* Keep animation running on hover */
 }
 
-.wizard-reset-btn {
+.wizard-spacer {
+    flex: 1;
+}
+
+.wizard-exit-btn {
     margin-top: 8px;
-    padding: 10px 12px;
-    background: #dc2626;
+    padding: 8px 12px;
+    background: #6b7280;
     color: white;
     border: none;
     border-radius: 4px;
@@ -1570,8 +1574,8 @@ header h1 {
     transition: all 0.2s;
 }
 
-.wizard-reset-btn:hover {
-    background: #b91c1c;
+.wizard-exit-btn:hover {
+    background: #4b5563;
 }
 
 /* Column 3: Notebook cells */
@@ -1623,6 +1627,13 @@ header h1 {
     justify-content: space-between;
 }
 
+.cell-header-example {
+    font-weight: normal;
+    font-size: 0.9em;
+    color: #8b7aaa;
+    font-style: italic;
+}
+
 .cell-badge {
     background: #3d2e6b;
     color: #888;
@@ -1672,6 +1683,13 @@ header h1 {
     align-items: center;
 }
 
+.debug-controls-label {
+    font-size: 0.85em;
+    font-weight: bold;
+    color: #a78bfa;
+    margin-right: 2px;
+}
+
 .debug-content {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1719,7 +1737,7 @@ header h1 {
 
 .debug-right .register-grid-compact {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 4px;
     background: #12101f;
     padding: 8px;
@@ -1766,13 +1784,30 @@ header h1 {
     color: #87ceeb;
 }
 
-.cycle-info {
+.reg-tip {
+    font-size: 0.7em;
+    color: #777;
+    margin-left: 3px;
+    vertical-align: super;
+    cursor: help;
+    border: 1px solid #555;
+    border-radius: 50%;
+    padding: 0 3px;
+}
+
+.emu-status-line {
     margin-top: 8px;
     padding: 6px 8px;
     background: #12101f;
     border-radius: 3px;
-    color: #888;
     font-size: 0.75em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.emu-status-line .instruction-count {
+    color: #888;
 }
 
 .memory-section {
@@ -1865,6 +1900,23 @@ header h1 {
     animation: none;
 }
 
+.rust-wizard-layout .step-count-select {
+    background: #1e1e2e;
+    color: #e0e0e0;
+    border: 1px solid #7c3aed;
+    border-radius: 3px;
+    padding: 5px 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.rust-wizard-layout .step-count-select:disabled {
+    border-color: #555;
+    color: #888;
+    cursor: not-allowed;
+}
+
 .rust-wizard-layout .run-btn {
     background: #059669;
     color: white;
@@ -1900,11 +1952,28 @@ header h1 {
     background: #b91c1c;
 }
 
-.rust-wizard-layout .status-halted {
-    color: #dc2626;
+.rust-wizard-layout .emu-state {
     font-weight: bold;
     font-size: 0.85em;
     margin-left: auto;
+    padding: 2px 8px;
+    border-radius: 3px;
+}
+
+.rust-wizard-layout .emu-ready {
+    color: #9ca3af;
+}
+
+.rust-wizard-layout .emu-running {
+    color: #22c55e;
+}
+
+.rust-wizard-layout .emu-paused {
+    color: #eab308;
+}
+
+.rust-wizard-layout .emu-halted {
+    color: #dc2626;
 }
 
 /* Current line in assembly listing - purple theme */

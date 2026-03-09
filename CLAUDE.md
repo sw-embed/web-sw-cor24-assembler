@@ -4,12 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build Commands
 
+**Always use scripts, not raw commands, for building and serving.** This ensures consistent flags (e.g. `--release`, `--port`) and clean-build support.
+
 ```bash
-# Development server with hot reload (http://localhost:7401/cor24-rs/)
-./serve.sh
+# Local preview with hot reload (http://localhost:7401/cor24-rs/)
+./serve.sh              # incremental build + serve
+./serve.sh --clean      # clean build + serve
 
 # Production build (outputs to pages/)
-trunk build --release
+./build.sh              # incremental build
+./build.sh --clean      # clean build
 
 # Run tests
 cargo test
@@ -22,7 +26,7 @@ Prerequisites: Rust 1.75+, Trunk (`cargo install trunk`), `rustup target add was
 
 ## Deployment
 
-The `pages/` directory contains pre-built production assets and is committed to git. GitHub Actions deploys from `pages/` on push to `main` — no CI build step, just upload. After `trunk build --release`, commit the updated `pages/` directory to deploy.
+The `pages/` directory contains pre-built production assets and is committed to git. GitHub Actions deploys from `pages/` on push to `main` — no CI build step, just upload. After `./build.sh`, commit the updated `pages/` directory to deploy.
 
 ## Architecture
 
@@ -32,7 +36,7 @@ This is a browser-based COR24 CPU emulator written in Rust, compiled to WebAssem
 
 - **`src/`** — Main application crate (`cor24-emulator`)
 - **`components/`** — Reusable Yew UI components library
-- **`rust-to-cor24/`** — Standalone CLI tool (not part of workspace) that translates WASM to COR24 assembly. Uses `wasmparser` crate. Not compiled to WASM — used offline to generate examples.
+- **`rust-to-cor24/`** — Standalone CLI tool (not part of workspace) that compiles Rust via MSP430 target and translates MSP430 ASM to COR24 assembly. Not compiled to WASM — used offline to generate pipeline examples.
 
 ### Core Modules (src/)
 
@@ -49,7 +53,7 @@ This is a browser-based COR24 CPU emulator written in Rust, compiled to WebAssem
 
 ### UI Components (components/)
 
-Yew components: `Header`, `Sidebar`, `TabBar`, `ProgramArea`, `RegisterPanel`, `MemoryViewer`, `Modal`, `Collapsible`, `RustPipeline`. The `RustPipeline` component implements a wizard-driven 3-column view showing Rust→WASM→COR24 compilation stages.
+Yew components: `Header`, `Sidebar`, `TabBar`, `ProgramArea`, `RegisterPanel`, `MemoryViewer`, `Modal`, `Collapsible`, `RustPipeline`. The `RustPipeline` component implements a wizard-driven 3-column view showing the Rust→MSP430 ASM→COR24 ASM→Machine Code pipeline with pre-built examples.
 
 ### Key Patterns
 

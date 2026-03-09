@@ -350,8 +350,11 @@ pub fn app() -> Html {
                 }
                 // Capture stack region (64 bytes around SP)
                 let sp = new_cpu.read_register(4);
-                let stack_display_bytes: u32 = 64;
-                let memory_stack = new_cpu.get_memory_slice(sp, stack_display_bytes);
+                // Stack: show from 16-byte-aligned SP up to 0xFEEC00, minimum 16 bytes
+                let stack_top: u32 = 0xFEEC00;
+                let aligned_start = (sp.min(stack_top - 16)) & !0xF;
+                let stack_size = (stack_top - aligned_start).min(256);
+                let memory_stack = new_cpu.get_memory_slice(aligned_start, stack_size);
                 let program_end = new_cpu.get_program_end();
 
                 rust_cpu_state.set(RustCpuState {
@@ -366,7 +369,7 @@ pub fn app() -> Html {
                     memory_low: memory_low.clone(),
                     memory_high: memory_high.clone(),
                     memory_stack: memory_stack.clone(),
-                    stack_base_addr: sp,
+                    stack_base_addr: aligned_start,
                     program_end,
                     prev_memory_low: memory_low.clone(),
                     prev_memory_high: memory_high.clone(),
@@ -385,16 +388,26 @@ pub fn app() -> Html {
         })
     };
 
-    // Rust pipeline: Step one instruction
+    // Rust pipeline: Step N instructions
     let on_rust_step = {
         let rust_cpu = rust_cpu.clone();
         let rust_cpu_state = rust_cpu_state.clone();
 
-        Callback::from(move |()| {
+        Callback::from(move |count: u32| {
             let mut new_cpu = (*rust_cpu).clone();
             let prev_state = (*rust_cpu_state).clone();
 
-            if new_cpu.step().is_ok() {
+            // Execute up to `count` steps, stopping early on halt/error
+            for _ in 0..count {
+                if new_cpu.is_halted() {
+                    break;
+                }
+                if new_cpu.step().is_err() {
+                    break;
+                }
+            }
+
+            {
                 let regs = new_cpu.get_registers();
                 let mut registers = [0u32; 8];
                 for (i, &val) in regs.iter().enumerate().take(8) {
@@ -412,8 +425,11 @@ pub fn app() -> Html {
                 }
                 // Capture stack region (64 bytes around SP)
                 let sp = new_cpu.read_register(4);
-                let stack_display_bytes: u32 = 64;
-                let memory_stack = new_cpu.get_memory_slice(sp, stack_display_bytes);
+                // Stack: show from 16-byte-aligned SP up to 0xFEEC00, minimum 16 bytes
+                let stack_top: u32 = 0xFEEC00;
+                let aligned_start = (sp.min(stack_top - 16)) & !0xF;
+                let stack_size = (stack_top - aligned_start).min(256);
+                let memory_stack = new_cpu.get_memory_slice(aligned_start, stack_size);
 
                 rust_cpu_state.set(RustCpuState {
                     registers,
@@ -427,7 +443,7 @@ pub fn app() -> Html {
                     memory_low,
                     memory_high,
                     memory_stack,
-                    stack_base_addr: sp,
+                    stack_base_addr: aligned_start,
                     program_end: new_cpu.get_program_end(),
                     prev_memory_low: prev_state.memory_low,
                     prev_memory_high: prev_state.memory_high,
@@ -536,7 +552,11 @@ pub fn app() -> Html {
                     }
                     // Capture stack region (64 bytes around SP)
                     let sp = current_cpu.read_register(4);
-                    let memory_stack = current_cpu.get_memory_slice(sp, 64);
+                    // Stack: show from 16-byte-aligned SP up to 0xFEEC00, minimum 16 bytes
+                    let stack_top: u32 = 0xFEEC00;
+                    let aligned_start = (sp.min(stack_top - 16)) & !0xF;
+                    let stack_size = (stack_top - aligned_start).min(256);
+                    let memory_stack = current_cpu.get_memory_slice(aligned_start, stack_size);
 
                     // Save current values as prev for next iteration
                     let next_prev_regs = registers;
@@ -560,7 +580,7 @@ pub fn app() -> Html {
                         memory_low,
                         memory_high,
                         memory_stack,
-                        stack_base_addr: sp,
+                        stack_base_addr: aligned_start,
                         program_end: current_cpu.get_program_end(),
                         prev_memory_low: prev_mem_low,
                         prev_memory_high: prev_mem_high,
@@ -644,9 +664,12 @@ pub fn app() -> Html {
                     for addr in 0xFFFF80..=0xFFFFFF {
                         memory_high.push(new_cpu.read_byte(addr as u32));
                     }
-                    // Capture stack region (64 bytes around SP)
+                    // Capture stack region (top 16+ bytes, 16-byte aligned)
                     let sp = new_cpu.read_register(4);
-                    let memory_stack = new_cpu.get_memory_slice(sp, 64);
+                    let stack_top: u32 = 0xFEEC00;
+                    let aligned_start = (sp.min(stack_top - 16)) & !0xF;
+                    let stack_size = (stack_top - aligned_start).min(256);
+                    let memory_stack = new_cpu.get_memory_slice(aligned_start, stack_size);
                     let program_end = new_cpu.get_program_end();
 
                     rust_cpu_state.set(RustCpuState {
@@ -661,7 +684,7 @@ pub fn app() -> Html {
                         memory_low: memory_low.clone(),
                         memory_high: memory_high.clone(),
                         memory_stack: memory_stack.clone(),
-                        stack_base_addr: sp,
+                        stack_base_addr: aligned_start,
                         program_end,
                         prev_memory_low: memory_low.clone(),
                         prev_memory_high: memory_high.clone(),
@@ -1362,244 +1385,786 @@ jmp     (r1)        ; Return
 </ul>
 "#;
 
-/// Pre-built Rust pipeline examples
+/// Pre-built Rust pipeline examples (Rust → MSP430 → COR24)
 fn get_rust_examples() -> Vec<RustExample> {
     vec![
+        // Demo 1: Blinky
         RustExample {
-            name: "LED Blink".to_string(),
-            description: "Binary counter with delay loop".to_string(),
-            rust_source: r#"#![no_std]
-use core::panic::PanicInfo;
-
-const LEDS: *mut u8 = 0xFF0000 as *mut u8;
-const DELAY: u32 = 10; // Spin loop iterations
-
-#[panic_handler]
-fn panic(_: &PanicInfo) -> ! { loop {} }
-
-#[no_mangle]
-pub extern "C" fn main() -> ! {
-    let mut counter: u8 = 0;
+            name: "Blinky".to_string(),
+            description: "Toggle LED with delay loop".to_string(),
+            rust_source: r#"#[no_mangle]
+pub unsafe fn demo_blinky() -> ! {
     loop {
-        unsafe { core::ptr::write_volatile(LEDS, counter); }
-        // Delay loop
-        for _ in 0..DELAY {
-            unsafe { core::ptr::read_volatile(LEDS); }
-        }
-        counter = counter.wrapping_add(1);
+        mmio_write(LED_ADDR, 1);   // LED on
+        delay(5000);
+        mmio_write(LED_ADDR, 0);   // LED off
+        delay(5000);
     }
 }"#.to_string(),
-            wasm_hex: "0061 736d 0100 0000 010a 0260 0000 6002\n\
-                       7f7f 017f 0303 0200 01".to_string(),
-            wasm_size: 64,
-            wasm_disassembly: r#"(module
-  (func (;0;) (type 0)
-    (local i32 i32)
-    i32.const 0
-    local.set 0
-    loop  ;; outer loop
-      ;; write LED
-      i32.const 0xFF0000
-      local.get 0
-      i32.store8
-      ;; delay loop: count 10 iterations
-      i32.const 10
-      local.set 1
-      loop  ;; delay
-        local.get 1
-        i32.const 1
-        i32.sub
-        local.tee 1
-        br_if 0
-      end
-      ;; increment counter
-      local.get 0
-      i32.const 1
-      i32.add
-      local.set 0
-      br 0
-    end))"#.to_string(),
-            cor24_assembly: r#"; LED Blink with delay loop
-; counter in 0(fp), delay in r2
-main:
-        push    fp
-        mov     fp, sp
-        add     sp, -3          ; reserve 1 word for counter
-        lc      r0, 0
-        sw      r0, 0(fp)       ; counter = 0
-.loop:
-        ; Write counter to LEDs
-        la      r0, 0xFF0000
-        lw      r1, 0(fp)
-        sb      r1, 0(r0)
-        ; Delay loop: r2 = 10, count down to 0
-        lc      r2, 10
-.delay:
-        lc      r0, 1
-        sub     r2, r0
-        brt     .delay          ; branch if r2 > 0
-        ; Increment counter
-        lw      r0, 0(fp)
-        lc      r1, 1
-        add     r0, r1
-        sw      r0, 0(fp)
-        bra     .loop"#.to_string(),
-            machine_code_hex: "6a4c 21fd 4400 8a00 2b00 00ff 9300 8800\n\
-                              4602 4401 0a14 fd92 0045 0101 8a00 13e6".to_string(),
-            machine_code_size: 32,
-            listing: r#"0000: 6A           push    fp
-0001: 4C           mov     fp, sp
-0002: 21 FD        add     sp, -3
-0004: 44 00        lc      r0, 0
-0006: 8A 00        sw      r0, 0(fp)
-0008: 2B 00 00 FF  .loop: la r0, 0xFF0000
-000C: 93 00        lw      r1, 0(fp)
-000E: 88 00        sb      r1, 0(r0)
-0010: 46 0A        lc      r2, 10
-0012: 44 01   .delay: lc r0, 1
-0014: 0A           sub     r2, r0
-0015: 15 FB        brt     .delay
-0017: 92 00        lw      r0, 0(fp)
-0019: 45 01        lc      r1, 1
-001B: 01           add     r0, r1
-001C: 8A 00        sw      r0, 0(fp)
-001E: 13 E8        bra     .loop"#.to_string(),
+            msp430_asm: r#"demo_blinky:
+.LBB4_1:
+	mov	#-256, r12        ; LED_ADDR = 0xFF00
+	mov	#1, r13
+	call	#mmio_write
+	mov	#5000, r12
+	call	#delay
+	mov	#-256, r12
+	clr	r13
+	call	#mmio_write
+	mov	#5000, r12
+	call	#delay
+	jmp	.LBB4_1
+
+mmio_write:
+	mov	r13, 0(r12)
+	ret
+
+delay:
+	sub	#2, r1
+	tst	r12
+	jeq	.LBB2_3
+	add	#-1, r12
+.LBB2_2:
+	mov	r12, 0(r1)
+	add	#-1, r12
+	cmp	#-1, r12
+	jne	.LBB2_2
+.LBB2_3:
+	add	#2, r1
+	ret"#.to_string(),
+            cor24_assembly: r#"; --- demo_blinky: toggle LED on/off with delay ---
+demo_blinky:
+.LBB4_1:
+    la      r0, 0xFF0000
+    lc      r1, 1
+    la      r2, .Lret_6
+    push    r2
+    la      r2, mmio_write
+    jmp     (r2)
+    .Lret_6:
+    la      r0, 0x001388      ; delay(5000)
+    la      r2, .Lret_7
+    push    r2
+    la      r2, delay
+    jmp     (r2)
+    .Lret_7:
+    la      r0, 0xFF0000
+    lc      r1, 0
+    la      r2, .Lret_8
+    push    r2
+    la      r2, mmio_write
+    jmp     (r2)
+    .Lret_8:
+    la      r0, 0x001388      ; delay(5000)
+    la      r2, .Lret_9
+    push    r2
+    la      r2, delay
+    jmp     (r2)
+    .Lret_9:
+    bra     .LBB4_1
+
+mmio_write:
+    sw      r1, 0(r0)
+    pop     r2
+    jmp     (r2)
+
+delay:
+    sub     sp, 3
+    ceq     r0, z
+    brt     .LBB2_3
+    add     r0, -1
+.LBB2_2:
+    mov     r2, sp
+    sw      r0, 0(r2)
+    add     r0, -1
+    lc      r1, -1
+    ceq     r0, r1
+    brf     .LBB2_2
+.LBB2_3:
+    add     sp, 3
+    pop     r2
+    jmp     (r2)"#.to_string(),
         },
+        // Demo 2: UART Hello World
         RustExample {
-            name: "Add & Store".to_string(),
-            description: "Add two numbers and store result to memory locations".to_string(),
-            rust_source: r#"#![no_std]
-use core::panic::PanicInfo;
-
-#[panic_handler]
-fn panic(_: &PanicInfo) -> ! { loop {} }
-
-// Store result at multiple memory locations
-static mut RESULT_A: u32 = 0;
-static mut RESULT_B: u32 = 0;
-static mut RESULT_C: u32 = 0;
+            name: "UART Hello".to_string(),
+            description: "Write \"Hello\\n\" to UART output".to_string(),
+            rust_source: r#"#[inline(never)]
+pub unsafe fn uart_putc(ch: u16) {
+    mmio_write(UART_DATA, ch);
+}
 
 #[no_mangle]
-pub extern "C" fn add_and_store(a: i32, b: i32) {
-    let sum = a + b;
-    unsafe {
-        RESULT_A = sum as u32;  // Store at 0x50
-        RESULT_B = RESULT_A;    // Copy to 0x53
-        RESULT_C = RESULT_B;    // Copy to 0x56
-    }
+pub unsafe fn demo_uart_hello() {
+    uart_putc(b'H' as u16);
+    uart_putc(b'e' as u16);
+    uart_putc(b'l' as u16);
+    uart_putc(b'l' as u16);
+    uart_putc(b'o' as u16);
+    uart_putc(b'\n' as u16);
+    loop {}  // halt
 }"#.to_string(),
-            wasm_hex: "0061 736d 0100 0000 0107 0160 027f 7f01\n\
-                       7f03 0201 0007 0701 0361 6464 0000 0a09\n\
-                       0107 0020 0020 016a 0b".to_string(),
-            wasm_size: 42,
-            wasm_disassembly: r#"(module
-  (type (;0;) (func (param i32 i32) (result i32)))
-  (func (;0;) (type 0) (param i32 i32) (result i32)
-    local.get 0
-    local.get 1
-    i32.add
-    ;; store to memory locations
-    global.set $result_a
-    global.get $result_a
-    global.set $result_b
-    global.get $result_b
-    global.set $result_c)
-  (export "add_and_store" (func 0)))"#.to_string(),
-            cor24_assembly: r#"; Add & Store: compute sum and store at 3 memory locations
-; Input: r0 = a (10), r1 = b (25)
-; Output: result stored at 0x50, 0x53, 0x56
-add_and_store:
-        push    fp
-        mov     fp, sp
-        ; Load inputs: a=10, b=25
-        lc      r0, 10          ; r0 = 10
-        lc      r1, 25          ; r1 = 25
-        ; Compute sum
-        add     r0, r1          ; r0 = 10 + 25 = 35
-        ; Store result at 0x50
-        la      r2, 0x000050
-        sw      r0, 0(r2)       ; mem[0x50] = 35
-        ; Copy to 0x53
-        lw      r1, 0(r2)       ; r1 = mem[0x50]
-        la      r2, 0x000053
-        sw      r1, 0(r2)       ; mem[0x53] = 35
-        ; Copy to 0x56
-        lw      r0, 0(r2)       ; r0 = mem[0x53]
-        la      r2, 0x000056
-        sw      r0, 0(r2)       ; mem[0x56] = 35
-        ; Cleanup
-        mov     sp, fp
-        pop     fp
-halt:   bra     halt        ; Done"#.to_string(),
-            machine_code_hex: "6a4c 440a 4519 01 2b50 0000 8a00 9300\n\
-                              2b53 0000 8b00 9200 2b56 0000 8a00 53 76\n\
-                              13fc".to_string(),
-            machine_code_size: 36,
-            listing: r#"0000: 6A           push    fp
-0001: 4C           mov     fp, sp
-0002: 44 0A        lc      r0, 10
-0004: 45 19        lc      r1, 25
-0006: 01           add     r0, r1
-0007: 2A 50 00 00  la      r2, 0x000050
-000B: 8A 00        sw      r0, 0(r2)
-000D: 93 00        lw      r1, 0(r2)
-000F: 2A 53 00 00  la      r2, 0x000053
-0013: 8B 00        sw      r1, 0(r2)
-0015: 92 00        lw      r0, 0(r2)
-0017: 2A 56 00 00  la      r2, 0x000056
-001B: 8A 00        sw      r0, 0(r2)
-001D: 53           mov     sp, fp
-001E: 76           pop     fp
-001F: 13 FC        bra     halt"#.to_string(),
+            msp430_asm: r#"demo_uart_hello:
+	mov	#72, r12          ; 'H'
+	call	#uart_putc
+	mov	#101, r12         ; 'e'
+	call	#uart_putc
+	mov	#108, r12         ; 'l'
+	call	#uart_putc
+	mov	#108, r12         ; 'l'
+	call	#uart_putc
+	mov	#111, r12         ; 'o'
+	call	#uart_putc
+	mov	#10, r12          ; '\n'
+	call	#uart_putc
+.LBB10_1:
+	jmp	.LBB10_1
+
+uart_putc:
+	mov	r12, r13
+	mov	#-255, r12        ; UART_DATA
+	call	#mmio_write
+	ret"#.to_string(),
+            cor24_assembly: r#"; --- demo_uart_hello: send "Hello\n" via UART ---
+demo_uart_hello:
+    lc      r0, 72            ; 'H'
+    la      r2, .Lret_20
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_20:
+    lc      r0, 101           ; 'e'
+    la      r2, .Lret_21
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_21:
+    lc      r0, 108           ; 'l'
+    la      r2, .Lret_22
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_22:
+    lc      r0, 108           ; 'l'
+    la      r2, .Lret_23
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_23:
+    lc      r0, 111           ; 'o'
+    la      r2, .Lret_24
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_24:
+    lc      r0, 10            ; '\n'
+    la      r2, .Lret_25
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_25:
+.LBB10_1:
+    bra     .LBB10_1
+
+uart_putc:
+    mov     r1, r0
+    la      r0, 0xFF0100
+    la      r2, .Lret_30
+    push    r2
+    la      r2, mmio_write
+    jmp     (r2)
+    .Lret_30:
+    pop     r2
+    jmp     (r2)
+
+mmio_write:
+    sw      r1, 0(r0)
+    pop     r2
+    jmp     (r2)"#.to_string(),
         },
+        // Demo 3: Add
         RustExample {
-            name: "Button Echo (blinky)".to_string(),
-            description: "LED D2 follows button S2 - matches COR24-TB hardware blinky demo".to_string(),
-            rust_source: r#"#![no_std]
-use core::panic::PanicInfo;
+            name: "Add".to_string(),
+            description: "Compute 100 + 200 + 42 = 342, return in r0".to_string(),
+            rust_source: r#"#[no_mangle]
+pub fn demo_add() -> u16 {
+    let a: u16 = 100;
+    let b: u16 = 200;
+    let c: u16 = 42;
+    a + b + c  // = 342 (0x156)
+}"#.to_string(),
+            msp430_asm: r#"demo_add:
+	mov	#342, r12         ; compiler constant-folded!
+	ret"#.to_string(),
+            cor24_assembly: r#"; --- demo_add: returns 342 (0x156) in r0 ---
+; The compiler constant-folds 100+200+42 at compile time.
+demo_add:
+    la      r0, 0x000156
+    pop     r2
+    jmp     (r2)"#.to_string(),
+        },
+        // Demo 4: Countdown
+        RustExample {
+            name: "Countdown".to_string(),
+            description: "Count 10→0 on LED, then halt".to_string(),
+            rust_source: r#"#[no_mangle]
+pub unsafe fn demo_countdown() {
+    let mut count: u16 = 10;
+    while count != 0 {
+        mmio_write(LED_ADDR, count);
+        delay(1000);
+        count -= 1;
+    }
+    mmio_write(LED_ADDR, 0);  // Clear LED
+    loop {}  // Halt
+}"#.to_string(),
+            msp430_asm: r#"demo_countdown:
+	push	r10
+	mov	#10, r10
+.LBB6_1:
+	mov	#-256, r12
+	mov	r10, r13
+	call	#mmio_write
+	mov	#1000, r12
+	call	#delay
+	add	#-1, r10
+	tst	r10
+	jne	.LBB6_1
+	mov	#-256, r12
+	clr	r13
+	call	#mmio_write
+.LBB6_3:
+	jmp	.LBB6_3"#.to_string(),
+            cor24_assembly: r#"; --- demo_countdown: count 10 down to 0 on LED ---
+demo_countdown:
+    lw      r0, 18(fp)
+    push    r0
+    lc      r0, 10
+    sw      r0, 18(fp)
+.LBB6_1:
+    la      r0, 0xFF0000
+    lw      r1, 18(fp)
+    la      r2, .Lret_12
+    push    r2
+    la      r2, mmio_write
+    jmp     (r2)
+    .Lret_12:
+    la      r0, 0x0003E8      ; delay(1000)
+    la      r2, .Lret_13
+    push    r2
+    la      r2, delay
+    jmp     (r2)
+    .Lret_13:
+    lw      r0, 18(fp)
+    add     r0, -1
+    sw      r0, 18(fp)
+    lw      r0, 18(fp)
+    ceq     r0, z
+    brf     .LBB6_1
+    la      r0, 0xFF0000
+    lc      r1, 0
+    la      r2, .Lret_14
+    push    r2
+    la      r2, mmio_write
+    jmp     (r2)
+    .Lret_14:
+.LBB6_3:
+    bra     .LBB6_3
 
-#[panic_handler]
-fn panic(_: &PanicInfo) -> ! { loop {} }
+mmio_write:
+    sw      r1, 0(r0)
+    pop     r2
+    jmp     (r2)
 
-// Memory-mapped I/O address for LED/Button
-const LEDSWDAT: *mut u8 = 0xFF0000 as *mut u8;
-
-#[no_mangle]
-pub extern "C" fn button_echo() {
+delay:
+    sub     sp, 3
+    ceq     r0, z
+    brt     .LBB2_3
+    add     r0, -1
+.LBB2_2:
+    mov     r2, sp
+    sw      r0, 0(r2)
+    add     r0, -1
+    lc      r1, -1
+    ceq     r0, r1
+    brf     .LBB2_2
+.LBB2_3:
+    add     sp, 3
+    pop     r2
+    jmp     (r2)"#.to_string(),
+        },
+        // Demo 5: Button Echo
+        RustExample {
+            name: "Button Echo".to_string(),
+            description: "LED D2 follows button S2 — click S2 while running".to_string(),
+            rust_source: r#"#[no_mangle]
+pub unsafe fn demo_button_echo() -> ! {
     loop {
-        unsafe {
-            // Read button S2 (bit 0), write to LED D2 (bit 0)
-            *LEDSWDAT = *LEDSWDAT;
-        }
+        let btn = mmio_read(LED_ADDR);
+        // S2 is active-low: 1=released, 0=pressed
+        // Invert so LED is ON when button pressed
+        let led = (btn ^ 1) & 1;
+        mmio_write(LED_ADDR, led);
     }
 }"#.to_string(),
-            wasm_hex: "Conceptual - hardware I/O not in WASM".to_string(),
-            wasm_size: 0,
-            wasm_disassembly: r#"; Button Echo cannot compile to WASM
-; (hardware I/O is platform-specific)
-; This shows the direct COR24 implementation"#.to_string(),
-            cor24_assembly: r#"; Button Echo (blinky) - LED D2 follows button S2
-; Matches COR24-TB hardware demo blinky.c
-; Click S2 button in I/O panel while running
-;
-; *LEDSWDAT = *LEDSWDAT (read button, write LED)
+            msp430_asm: r#"demo_button_echo:
+.LBB5_1:
+	mov	#-256, r12
+	call	#mmio_read
+	xor	#1, r12           ; invert S2 (active-low)
+	mov	r12, r13
+	and	#1, r13
+	mov	#-256, r12
+	call	#mmio_write
+	jmp	.LBB5_1
 
-button_echo:
-        la      r1, 0xFF0000    ; I/O address (LEDSWDAT)
+mmio_read:
+	mov	0(r12), r12
+	ret
 
-.loop:
-        lb      r0, 0(r1)       ; Read button S2 (bit 0)
-        sb      r0, 0(r1)       ; Write to LED D2 (bit 0)
-        bra     .loop           ; Keep polling
+mmio_write:
+	mov	r13, 0(r12)
+	ret"#.to_string(),
+            cor24_assembly: r#"; --- demo_button_echo: LED ON when S2 pressed ---
+demo_button_echo:
+.LBB5_1:
+    la      r0, 0xFF0000
+    la      r2, .Lret_10
+    push    r2
+    la      r2, mmio_read
+    jmp     (r2)
+    .Lret_10:
+    mov     r1, r0          ; r1 = switch value
+    lc      r0, 1
+    xor     r1, r0          ; invert: 1=released->0, 0=pressed->1
+    lc      r0, 1
+    and     r1, r0          ; mask to bit 0
+    la      r0, 0xFF0000
+    la      r2, .Lret_11
+    push    r2
+    la      r2, mmio_write
+    jmp     (r2)
+    .Lret_11:
+    bra     .LBB5_1
 
-halt:   bra     halt            ; Never reached"#.to_string(),
-            machine_code_hex: "2900 00ff 2e00 8200 13f8 13fc".to_string(),
-            machine_code_size: 12,
-            listing: r#"0000: 29 00 00 FF  la      r1, 0xFF0000
-0004: 2E 00        lb      r0, 0(r1)
-0006: 82 00        sb      r0, 0(r1)
-0008: 13 F8        bra     .loop
-000A: 13 FC        bra     halt"#.to_string(),
+mmio_read:
+    lw      r0, 0(r0)
+    pop     r2
+    jmp     (r2)
+
+mmio_write:
+    sw      r1, 0(r0)
+    pop     r2
+    jmp     (r2)"#.to_string(),
+        },
+        // Demo 6: Fibonacci
+        RustExample {
+            name: "Fibonacci".to_string(),
+            description: "Compute fib(10) = 55, display on LED".to_string(),
+            rust_source: r#"#[no_mangle]
+pub fn fibonacci(n: u16) -> u16 {
+    if n <= 1 { return n; }
+    let mut a: u16 = 0;
+    let mut b: u16 = 1;
+    let mut i: u16 = 2;
+    while i <= n {
+        let tmp = a + b;
+        a = b;
+        b = tmp;
+        i += 1;
+    }
+    b
+}
+
+#[no_mangle]
+pub unsafe fn demo_fibonacci() {
+    let result = fibonacci(10);
+    mmio_write(LED_ADDR, result);
+    loop {}  // halt
+}"#.to_string(),
+            msp430_asm: r#"demo_fibonacci:
+	mov	#-256, r12        ; compiler constant-folded fib(10)=55
+	mov	#55, r13
+	call	#mmio_write
+.LBB7_1:
+	jmp	.LBB7_1
+
+fibonacci:
+	cmp	#2, r12
+	jhs	.LBB11_2
+	mov	r12, r13
+	jmp	.LBB11_4
+.LBB11_2:
+	mov	#2, r14
+	clr	r15
+	mov	#1, r13
+.LBB11_3:
+	mov	r13, r11
+	mov	r15, r13
+	add	r11, r13
+	inc	r14
+	cmp	r14, r12
+	mov	r11, r15
+	jhs	.LBB11_3
+.LBB11_4:
+	mov	r13, r12
+	ret"#.to_string(),
+            cor24_assembly: r#"; --- demo_fibonacci: fib(10)=55, write to LED ---
+; Note: compiler constant-folded the call, so the
+; fibonacci function is included but not called.
+demo_fibonacci:
+    la      r0, 0xFF0000
+    lc      r1, 55
+    la      r2, .Lret_15
+    push    r2
+    la      r2, mmio_write
+    jmp     (r2)
+    .Lret_15:
+.LBB7_1:
+    bra     .LBB7_1
+
+fibonacci:
+    lc      r1, 2
+    clu     r0, r1
+    brf     .LBB11_2
+    mov     r1, r0
+    bra     .LBB11_4
+.LBB11_2:
+    lc      r2, 2
+    lc      r0, 0
+    sw      r0, 24(fp)
+    lc      r1, 1
+.LBB11_3:
+    sw      r1, 21(fp)
+    lw      r1, 24(fp)
+    lw      r0, 21(fp)
+    add     r1, r0
+    add     r2, 1
+    clu     r0, r2
+    lw      r0, 21(fp)
+    sw      r0, 24(fp)
+    brf     .LBB11_3
+.LBB11_4:
+    mov     r0, r1
+    pop     r2
+    jmp     (r2)
+
+mmio_write:
+    sw      r1, 0(r0)
+    pop     r2
+    jmp     (r2)"#.to_string(),
+        },
+        // Demo 7: Nested Calls
+        RustExample {
+            name: "Nested Calls".to_string(),
+            description: "4-level call chain showing stack frames at halt".to_string(),
+            rust_source: r#"#[inline(never)]
+pub unsafe fn level_c(x: u16, y: u16) -> u16 {
+    mmio_write(LED_ADDR, x);
+    uart_putc(y);
+    loop {}  // halt — 3 stack frames live
+}
+
+#[inline(never)]
+pub unsafe fn level_b(x: u16) -> u16 {
+    let doubled = x + x;
+    let offset = doubled + 3;
+    level_c(offset, x)
+}
+
+#[inline(never)]
+pub unsafe fn level_a(x: u16) -> u16 {
+    let y = x + 10;
+    level_b(y)
+}
+
+#[no_mangle]
+pub unsafe fn demo_nested() {
+    let btn = mmio_read(LED_ADDR);
+    level_a(btn + 5);
+}"#.to_string(),
+            msp430_asm: r#"demo_nested:
+	mov	#-256, r12
+	call	#mmio_read
+	add	#5, r12
+	call	#level_a
+
+level_a:
+	add	#10, r12
+	call	#level_b
+
+level_b:
+	mov	r12, r13
+	add	r12, r12
+	add	#3, r12
+	call	#level_c
+
+level_c:
+	push	r10
+	mov	r13, r10
+	mov	r12, r13
+	mov	#-256, r12
+	call	#mmio_write
+	mov	r10, r12
+	call	#uart_putc
+.LBB14_1:
+	jmp	.LBB14_1"#.to_string(),
+            cor24_assembly: r#"; --- demo_nested: 4-level call chain ---
+demo_nested:
+    la      r0, 0xFF0000
+    la      r2, .Lret_16
+    push    r2
+    la      r2, mmio_read
+    jmp     (r2)
+    .Lret_16:
+    add     r0, 5
+    la      r2, .Lret_17
+    push    r2
+    la      r2, level_a
+    jmp     (r2)
+    .Lret_17:
+
+level_a:
+    add     r0, 10
+    la      r2, .Lret_26
+    push    r2
+    la      r2, level_b
+    jmp     (r2)
+    .Lret_26:
+
+level_b:
+    mov     r1, r0
+    add     r0, r0
+    add     r0, 3
+    la      r2, .Lret_27
+    push    r2
+    la      r2, level_c
+    jmp     (r2)
+    .Lret_27:
+
+level_c:
+    lw      r0, 18(fp)
+    push    r0
+    sw      r1, 18(fp)
+    mov     r1, r0
+    la      r0, 0xFF0000
+    la      r2, .Lret_28
+    push    r2
+    la      r2, mmio_write
+    jmp     (r2)
+    .Lret_28:
+    lw      r0, 18(fp)
+    la      r2, .Lret_29
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_29:
+.LBB14_1:
+    bra     .LBB14_1
+
+mmio_read:
+    lw      r0, 0(r0)
+    pop     r2
+    jmp     (r2)
+
+mmio_write:
+    sw      r1, 0(r0)
+    pop     r2
+    jmp     (r2)
+
+uart_putc:
+    mov     r1, r0
+    la      r0, 0xFF0100
+    la      r2, .Lret_30
+    push    r2
+    la      r2, mmio_write
+    jmp     (r2)
+    .Lret_30:
+    pop     r2
+    jmp     (r2)"#.to_string(),
+        },
+        // Demo 8: Stack Variables
+        RustExample {
+            name: "Stack Variables".to_string(),
+            description: "Register spilling — 5 callee-saved regs on stack".to_string(),
+            rust_source: r#"#[inline(never)]
+pub unsafe fn accumulate(seed: u16) -> u16 {
+    let a = seed + 1;
+    let b = a + seed;
+    let c = b + a;
+    let d = c + b;
+    let e = d + c;
+    let result = a ^ b ^ c ^ d ^ e;
+    mmio_write(LED_ADDR, result);
+    uart_putc(a);
+    uart_putc(b);
+    uart_putc(c);
+    uart_putc(d);
+    uart_putc(e);
+    loop {}  // halt with spill slots visible
+}
+
+#[no_mangle]
+pub unsafe fn demo_stack_vars() {
+    let x = mmio_read(LED_ADDR);
+    accumulate(x + 1);
+}"#.to_string(),
+            msp430_asm: r#"demo_stack_vars:
+	mov	#-256, r12
+	call	#mmio_read
+	inc	r12
+	call	#accumulate
+
+accumulate:
+	push	r6
+	push	r7
+	push	r8
+	push	r9
+	push	r10
+	mov	r12, r10          ; seed
+	mov	r10, r6
+	inc	r6                ; a = seed+1
+	add	r6, r10           ; b = a+seed
+	mov	r10, r9
+	add	r6, r9            ; c = b+a
+	mov	r10, r13
+	xor	r6, r13
+	xor	r9, r13
+	mov	r9, r8
+	add	r10, r8           ; d = c+b
+	xor	r8, r13
+	mov	r8, r7
+	add	r9, r7            ; e = d+c
+	xor	r7, r13           ; result = a^b^c^d^e
+	mov	#-256, r12
+	call	#mmio_write
+	mov	r6, r12
+	call	#uart_putc
+	; ... (sends b,c,d,e via uart_putc)
+.LBB1_1:
+	jmp	.LBB1_1"#.to_string(),
+            cor24_assembly: r#"; --- demo_stack_vars: 5 callee-saved register spills ---
+demo_stack_vars:
+    la      r0, 0xFF0000
+    la      r2, .Lret_18
+    push    r2
+    la      r2, mmio_read
+    jmp     (r2)
+    .Lret_18:
+    add     r0, 1
+    la      r2, .Lret_19
+    push    r2
+    la      r2, accumulate
+    jmp     (r2)
+    .Lret_19:
+
+accumulate:
+    lw      r0, 6(fp)
+    push    r0
+    lw      r0, 9(fp)
+    push    r0
+    lw      r0, 12(fp)
+    push    r0
+    lw      r0, 15(fp)
+    push    r0
+    lw      r0, 18(fp)
+    push    r0
+    sw      r0, 18(fp)
+    lw      r0, 18(fp)
+    sw      r0, 6(fp)
+    lw      r0, 6(fp)
+    add     r0, 1
+    sw      r0, 6(fp)
+    lw      r0, 18(fp)
+    lw      r1, 6(fp)
+    add     r0, r1
+    sw      r0, 18(fp)
+    lw      r0, 18(fp)
+    sw      r0, 15(fp)
+    lw      r0, 15(fp)
+    lw      r1, 6(fp)
+    add     r0, r1
+    sw      r0, 15(fp)
+    lw      r1, 18(fp)
+    lw      r0, 6(fp)
+    xor     r1, r0
+    lw      r0, 15(fp)
+    xor     r1, r0
+    lw      r0, 15(fp)
+    sw      r0, 12(fp)
+    lw      r0, 12(fp)
+    lw      r1, 18(fp)
+    add     r0, r1
+    sw      r0, 12(fp)
+    lw      r0, 12(fp)
+    xor     r1, r0
+    lw      r0, 12(fp)
+    sw      r0, 9(fp)
+    lw      r0, 9(fp)
+    lw      r1, 15(fp)
+    add     r0, r1
+    sw      r0, 9(fp)
+    lw      r0, 9(fp)
+    xor     r1, r0
+    la      r0, 0xFF0000
+    la      r2, .Lret_0
+    push    r2
+    la      r2, mmio_write
+    jmp     (r2)
+    .Lret_0:
+    lw      r0, 6(fp)
+    la      r2, .Lret_1
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_1:
+    lw      r0, 18(fp)
+    la      r2, .Lret_2
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_2:
+    lw      r0, 15(fp)
+    la      r2, .Lret_3
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_3:
+    lw      r0, 12(fp)
+    la      r2, .Lret_4
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_4:
+    lw      r0, 9(fp)
+    la      r2, .Lret_5
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_5:
+.LBB1_1:
+    bra     .LBB1_1
+
+mmio_read:
+    lw      r0, 0(r0)
+    pop     r2
+    jmp     (r2)
+
+mmio_write:
+    sw      r1, 0(r0)
+    pop     r2
+    jmp     (r2)
+
+uart_putc:
+    mov     r1, r0
+    la      r0, 0xFF0100
+    la      r2, .Lret_30
+    push    r2
+    la      r2, mmio_write
+    jmp     (r2)
+    .Lret_30:
+    pop     r2
+    jmp     (r2)"#.to_string(),
         },
     ]
 }

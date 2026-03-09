@@ -187,7 +187,7 @@ impl WasmCpu {
 
     /// Set switch state (simulates external switch input)
     pub fn set_switches(&mut self, value: u8) {
-        self.emu.set_button_pressed(value & 1 == 0);
+        self.emu.set_button_pressed(value & 1 == 1);
     }
 
     /// Toggle a specific switch bit
