@@ -15,7 +15,7 @@ pub struct ExamplePickerProps {
     pub title: String,
     pub examples: Vec<ExampleItem>,
     pub active: bool,
-    pub on_close: Callback<MouseEvent>,
+    pub on_close: Callback<()>,
     pub on_select: Callback<usize>,
 }
 

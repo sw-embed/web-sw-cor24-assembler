@@ -9,6 +9,7 @@ mod register_panel;
 mod rust_pipeline;
 mod sidebar;
 mod tab_bar;
+mod tooltip;
 
 pub use collapsible::*;
 pub use debug_panel::*;
@@ -21,3 +22,4 @@ pub use register_panel::*;
 pub use rust_pipeline::*;
 pub use sidebar::*;
 pub use tab_bar::*;
+pub use tooltip::*;

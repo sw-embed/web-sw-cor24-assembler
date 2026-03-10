@@ -117,6 +117,8 @@ pub struct RustPipelineProps {
     pub examples: Vec<RustExample>,
     #[prop_or_default]
     pub loaded_example: Option<RustExample>,
+    #[prop_or_default]
+    pub load_generation: u32,
     pub on_load: Callback<RustExample>,
     pub on_step: Callback<u32>,
     pub on_run: Callback<()>,
@@ -155,11 +157,11 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
         });
     }
 
-    // Reset wizard to Source step when a new example is loaded
+    // Reset wizard to Source step when an example is loaded (including re-selecting same one)
     {
         let current_step = current_step.clone();
-        let loaded_name = props.loaded_example.as_ref().map(|e| e.name.clone());
-        use_effect_with(loaded_name, move |_| {
+        let load_gen = props.load_generation;
+        use_effect_with(load_gen, move |_| {
             current_step.set(WizardStep::Source);
             || ()
         });

@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use components::{
     DebugPanel, ExampleItem, ExamplePicker, Header, Modal, ProgramArea,
-    EmulatorState, RustExample, RustPipeline, Sidebar, SidebarButton, Tab, TabBar,
+    EmulatorState, RustExample, RustPipeline, Sidebar, SidebarButton, Tab, TabBar, Tooltip,
 };
 use yew::prelude::*;
 
@@ -23,6 +23,7 @@ pub fn app() -> Html {
     let rust_is_loaded = use_state(|| false);
     let rust_is_running = use_state(|| false);
     let rust_loaded_example = use_state(|| None::<RustExample>);
+    let rust_load_gen = use_state(|| 0u32);
     let rust_switch_value = use_state(|| 0u8);
     // Use Rc<Cell> for immediate stop flag visibility in Rust pipeline
     let rust_stop_requested = use_mut_ref(|| Rc::new(Cell::new(false)));
@@ -226,6 +227,7 @@ pub fn app() -> Html {
             let current_cpu = (*cpu).clone();
 
             // Start the animated run loop
+            #[allow(clippy::too_many_arguments)]
             fn run_step(
                 mut current_cpu: WasmCpu,
                 cpu_handle: yew::UseStateHandle<WasmCpu>,
@@ -328,13 +330,13 @@ pub fn app() -> Html {
             // Reset CPU and re-assemble current program so Step/Run stay enabled
             let mut new_cpu = WasmCpu::new();
             let code = (*program_code).clone();
-            if !code.is_empty() {
-                if let Ok(_) = new_cpu.assemble(&code) {
-                    assembly_lines.set(new_cpu.get_assembled_lines());
-                    asm_emu_state.set(capture_cpu_state_initial(&new_cpu));
-                    cpu.set(new_cpu);
-                    return;
-                }
+            if !code.is_empty()
+                && new_cpu.assemble(&code).is_ok()
+            {
+                assembly_lines.set(new_cpu.get_assembled_lines());
+                asm_emu_state.set(capture_cpu_state_initial(&new_cpu));
+                cpu.set(new_cpu);
+                return;
             }
             // Fallback: no code or assembly failed — full reset
             assembly_lines.set(Vec::new());
@@ -357,8 +359,10 @@ pub fn app() -> Html {
         let rust_emu_state = rust_emu_state.clone();
         let rust_is_loaded = rust_is_loaded.clone();
         let rust_loaded_example = rust_loaded_example.clone();
+        let rust_load_gen = rust_load_gen.clone();
 
         Callback::from(move |example: RustExample| {
+            rust_load_gen.set(*rust_load_gen + 1);
             let mut new_cpu = WasmCpu::new();
             // Assemble the COR24 assembly from the example
             if new_cpu.assemble(&example.cor24_assembly).is_ok() {
@@ -814,6 +818,7 @@ pub fn app() -> Html {
 
     html! {
         <div class="container">
+            <Tooltip />
             <Header title="MakerLisp COR24 — Assembly Emulator">
                 <TabBar tabs={tabs} active_tab={(*active_tab).clone()} on_tab_change={on_tab_change} />
             </Header>
@@ -904,6 +909,7 @@ pub fn app() -> Html {
                 <RustPipeline
                     examples={rust_examples.clone()}
                     loaded_example={(*rust_loaded_example).clone()}
+                    load_generation={*rust_load_gen}
                     on_load={on_rust_load.clone()}
                     on_step={on_rust_step}
                     on_run={on_rust_run}
