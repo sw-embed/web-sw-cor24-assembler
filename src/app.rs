@@ -788,8 +788,8 @@ pub fn app() -> Html {
     // Rust pipeline: Unload (clear loaded state)
     // Tab definitions
     let tabs = vec![
-        Tab { id: "assembler".to_string(), label: "Assembler".to_string() },
-        Tab { id: "rust".to_string(), label: "Rust".to_string() },
+        Tab { id: "assembler".to_string(), label: "Assembler".to_string(), tooltip: Some("Write and run COR24 assembly directly".to_string()) },
+        Tab { id: "rust".to_string(), label: "Rust".to_string(), tooltip: Some("Rust → MSP430 → COR24 compilation pipeline".to_string()) },
     ];
 
     // Get examples for the modal

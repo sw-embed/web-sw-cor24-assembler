@@ -92,7 +92,8 @@ pub fn program_area(props: &ProgramAreaProps) -> Html {
 
             // Controls (middle)
             <div class="controls">
-                <button id="assembleBtn" onclick={on_assemble_click}>{"Assemble"}</button>
+                <button id="assembleBtn" onclick={on_assemble_click}
+                    data-tooltip="Assemble code into machine code">{"Assemble"}</button>
                 if props.show_exec_buttons {
                     <button id="stepBtn" onclick={on_step_click} disabled={!props.step_enabled || props.is_running}>{"Step"}</button>
                     if props.is_running {

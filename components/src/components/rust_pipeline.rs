@@ -84,6 +84,24 @@ impl WizardStep {
         }
     }
 
+    fn action_tooltip(&self) -> &'static str {
+        match self {
+            WizardStep::Source => "Compile Rust to MSP430 assembly",
+            WizardStep::Compile => "Translate MSP430 assembly to COR24 assembly",
+            WizardStep::Translate => "Assemble COR24 code into machine code",
+            WizardStep::Assemble => "",
+        }
+    }
+
+    fn step_tooltip(&self) -> &'static str {
+        match self {
+            WizardStep::Source => "Rust source code",
+            WizardStep::Compile => "MSP430 assembly (from rustc)",
+            WizardStep::Translate => "COR24 assembly (from MSP430)",
+            WizardStep::Assemble => "Machine code execution and debug",
+        }
+    }
+
     fn cell_id(&self) -> &'static str {
         match self {
             WizardStep::Source => "cell-source",
@@ -257,6 +275,7 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                         <div
                             class={class}
                             onclick={if !is_disabled { Some(on_step_click(step)) } else { None }}
+                            data-tooltip={step.step_tooltip()}
                         >
                             <span class="step-indicator">{indicator}</span>
                             <span class="step-label">{step.label()}</span>
@@ -266,7 +285,8 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
 
                 // Action button - Compile/Translate/Assemble (or nothing at final step)
                 if props.is_loaded && *current_step != WizardStep::Assemble {
-                    <button class="wizard-action-btn" onclick={advance_step.clone()}>
+                    <button class="wizard-action-btn" onclick={advance_step.clone()}
+                        data-tooltip={(*current_step).action_tooltip()}>
                         {(*current_step).action_label()}
                     </button>
                 }

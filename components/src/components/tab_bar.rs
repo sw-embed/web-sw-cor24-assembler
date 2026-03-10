@@ -6,6 +6,7 @@ use yew::prelude::*;
 pub struct Tab {
     pub id: String,
     pub label: String,
+    pub tooltip: Option<String>,
 }
 
 #[derive(Properties, PartialEq)]
@@ -28,8 +29,9 @@ pub fn tab_bar(props: &TabBarProps) -> Html {
                     let tab_id = tab_id.clone();
                     Callback::from(move |_| on_tab_change.emit(tab_id.clone()))
                 };
+                let tooltip = tab.tooltip.clone();
                 html! {
-                    <button class={class} onclick={on_click}>
+                    <button class={class} onclick={on_click} data-tooltip={tooltip}>
                         {&tab.label}
                     </button>
                 }
