@@ -1425,7 +1425,28 @@ fn capture_cpu_state_initial(cpu: &WasmCpu) -> EmulatorState {
 
 fn get_rust_examples() -> Vec<RustExample> {
     vec![
-        // Demo 1: Blink LED
+        // Demo 1: Add
+        RustExample {
+            name: "Add".to_string(),
+            description: "Compute 100 + 200 + 42 = 342, return in r0".to_string(),
+            rust_source: r#"#[no_mangle]
+pub fn demo_add() -> u16 {
+    let a: u16 = 100;
+    let b: u16 = 200;
+    let c: u16 = 42;
+    a + b + c  // = 342 (0x156)
+}"#.to_string(),
+            msp430_asm: r#"demo_add:
+	mov	#342, r12         ; compiler constant-folded!
+	ret"#.to_string(),
+            cor24_assembly: r#"; --- demo_add: returns 342 (0x156) in r0 ---
+; The compiler constant-folds 100+200+42 at compile time.
+demo_add:
+    la      r0, 0x000156
+    pop     r2
+    jmp     (r2)"#.to_string(),
+        },
+        // Demo 2: Blink LED
         RustExample {
             name: "Blink LED".to_string(),
             description: "Toggle LED with delay loop".to_string(),
@@ -1522,121 +1543,67 @@ delay:
     pop     r2
     jmp     (r2)"#.to_string(),
         },
-        // Demo 2: UART Hello World
+        // Demo 3: Button Echo
         RustExample {
-            name: "UART Hello".to_string(),
-            description: "Write \"Hello\\n\" to UART output".to_string(),
-            rust_source: r#"#[inline(never)]
-pub unsafe fn uart_putc(ch: u16) {
-    mmio_write(UART_DATA, ch);
-}
-
-#[no_mangle]
-pub unsafe fn demo_uart_hello() {
-    uart_putc(b'H' as u16);
-    uart_putc(b'e' as u16);
-    uart_putc(b'l' as u16);
-    uart_putc(b'l' as u16);
-    uart_putc(b'o' as u16);
-    uart_putc(b'\n' as u16);
-    loop {}  // halt
+            name: "Button Echo".to_string(),
+            description: "LED D2 follows button S2".to_string(),
+            rust_source: r#"#[no_mangle]
+pub unsafe fn demo_button_echo() -> ! {
+    loop {
+        let btn = mmio_read(LED_ADDR);
+        // S2 is active-low: 1=released, 0=pressed
+        // Invert so LED is ON when button pressed
+        let led = (btn ^ 1) & 1;
+        mmio_write(LED_ADDR, led);
+    }
 }"#.to_string(),
-            msp430_asm: r#"demo_uart_hello:
-	mov	#72, r12          ; 'H'
-	call	#uart_putc
-	mov	#101, r12         ; 'e'
-	call	#uart_putc
-	mov	#108, r12         ; 'l'
-	call	#uart_putc
-	mov	#108, r12         ; 'l'
-	call	#uart_putc
-	mov	#111, r12         ; 'o'
-	call	#uart_putc
-	mov	#10, r12          ; '\n'
-	call	#uart_putc
-.LBB10_1:
-	jmp	.LBB10_1
-
-uart_putc:
+            msp430_asm: r#"demo_button_echo:
+.LBB5_1:
+	mov	#-256, r12
+	call	#mmio_read
+	xor	#1, r12           ; invert S2 (active-low)
 	mov	r12, r13
-	mov	#-255, r12        ; UART_DATA
+	and	#1, r13
+	mov	#-256, r12
 	call	#mmio_write
-	ret"#.to_string(),
-            cor24_assembly: r#"; --- demo_uart_hello: send "Hello\n" via UART ---
-demo_uart_hello:
-    lc      r0, 72            ; 'H'
-    la      r2, .Lret_20
-    push    r2
-    la      r2, uart_putc
-    jmp     (r2)
-    .Lret_20:
-    lc      r0, 101           ; 'e'
-    la      r2, .Lret_21
-    push    r2
-    la      r2, uart_putc
-    jmp     (r2)
-    .Lret_21:
-    lc      r0, 108           ; 'l'
-    la      r2, .Lret_22
-    push    r2
-    la      r2, uart_putc
-    jmp     (r2)
-    .Lret_22:
-    lc      r0, 108           ; 'l'
-    la      r2, .Lret_23
-    push    r2
-    la      r2, uart_putc
-    jmp     (r2)
-    .Lret_23:
-    lc      r0, 111           ; 'o'
-    la      r2, .Lret_24
-    push    r2
-    la      r2, uart_putc
-    jmp     (r2)
-    .Lret_24:
-    lc      r0, 10            ; '\n'
-    la      r2, .Lret_25
-    push    r2
-    la      r2, uart_putc
-    jmp     (r2)
-    .Lret_25:
-.LBB10_1:
-    bra     .LBB10_1
+	jmp	.LBB5_1
 
-uart_putc:
-    mov     r1, r0
-    la      r0, 0xFF0100
-    la      r2, .Lret_30
+mmio_read:
+	mov	0(r12), r12
+	ret
+
+mmio_write:
+	mov	r13, 0(r12)
+	ret"#.to_string(),
+            cor24_assembly: r#"; --- demo_button_echo: LED ON when S2 pressed ---
+demo_button_echo:
+.LBB5_1:
+    la      r0, 0xFF0000
+    la      r2, .Lret_10
+    push    r2
+    la      r2, mmio_read
+    jmp     (r2)
+    .Lret_10:
+    mov     r1, r0          ; r1 = switch value
+    lc      r0, 1
+    xor     r1, r0          ; invert: 1=released->0, 0=pressed->1
+    lc      r0, 1
+    and     r1, r0          ; mask to bit 0
+    la      r0, 0xFF0000
+    la      r2, .Lret_11
     push    r2
     la      r2, mmio_write
     jmp     (r2)
-    .Lret_30:
+    .Lret_11:
+    bra     .LBB5_1
+
+mmio_read:
+    lw      r0, 0(r0)
     pop     r2
     jmp     (r2)
 
 mmio_write:
     sw      r1, 0(r0)
-    pop     r2
-    jmp     (r2)"#.to_string(),
-        },
-        // Demo 3: Add
-        RustExample {
-            name: "Add".to_string(),
-            description: "Compute 100 + 200 + 42 = 342, return in r0".to_string(),
-            rust_source: r#"#[no_mangle]
-pub fn demo_add() -> u16 {
-    let a: u16 = 100;
-    let b: u16 = 200;
-    let c: u16 = 42;
-    a + b + c  // = 342 (0x156)
-}"#.to_string(),
-            msp430_asm: r#"demo_add:
-	mov	#342, r12         ; compiler constant-folded!
-	ret"#.to_string(),
-            cor24_assembly: r#"; --- demo_add: returns 342 (0x156) in r0 ---
-; The compiler constant-folds 100+200+42 at compile time.
-demo_add:
-    la      r0, 0x000156
     pop     r2
     jmp     (r2)"#.to_string(),
         },
@@ -1730,71 +1697,7 @@ delay:
     pop     r2
     jmp     (r2)"#.to_string(),
         },
-        // Demo 5: Button Echo
-        RustExample {
-            name: "Button Echo".to_string(),
-            description: "LED D2 follows button S2".to_string(),
-            rust_source: r#"#[no_mangle]
-pub unsafe fn demo_button_echo() -> ! {
-    loop {
-        let btn = mmio_read(LED_ADDR);
-        // S2 is active-low: 1=released, 0=pressed
-        // Invert so LED is ON when button pressed
-        let led = (btn ^ 1) & 1;
-        mmio_write(LED_ADDR, led);
-    }
-}"#.to_string(),
-            msp430_asm: r#"demo_button_echo:
-.LBB5_1:
-	mov	#-256, r12
-	call	#mmio_read
-	xor	#1, r12           ; invert S2 (active-low)
-	mov	r12, r13
-	and	#1, r13
-	mov	#-256, r12
-	call	#mmio_write
-	jmp	.LBB5_1
-
-mmio_read:
-	mov	0(r12), r12
-	ret
-
-mmio_write:
-	mov	r13, 0(r12)
-	ret"#.to_string(),
-            cor24_assembly: r#"; --- demo_button_echo: LED ON when S2 pressed ---
-demo_button_echo:
-.LBB5_1:
-    la      r0, 0xFF0000
-    la      r2, .Lret_10
-    push    r2
-    la      r2, mmio_read
-    jmp     (r2)
-    .Lret_10:
-    mov     r1, r0          ; r1 = switch value
-    lc      r0, 1
-    xor     r1, r0          ; invert: 1=released->0, 0=pressed->1
-    lc      r0, 1
-    and     r1, r0          ; mask to bit 0
-    la      r0, 0xFF0000
-    la      r2, .Lret_11
-    push    r2
-    la      r2, mmio_write
-    jmp     (r2)
-    .Lret_11:
-    bra     .LBB5_1
-
-mmio_read:
-    lw      r0, 0(r0)
-    pop     r2
-    jmp     (r2)
-
-mmio_write:
-    sw      r1, 0(r0)
-    pop     r2
-    jmp     (r2)"#.to_string(),
-        },
-        // Demo 6: Fibonacci
+        // Demo 5: Fibonacci
         RustExample {
             name: "Fibonacci".to_string(),
             description: "Compute fib(10) = 55, display on LED".to_string(),
@@ -1891,7 +1794,7 @@ mmio_write:
     pop     r2
     jmp     (r2)"#.to_string(),
         },
-        // Demo 7: Nested Calls
+        // Demo 6: Nested Calls
         RustExample {
             name: "Nested Calls".to_string(),
             description: "Function call chain showing stack frames".to_string(),
@@ -2020,7 +1923,7 @@ uart_putc:
     pop     r2
     jmp     (r2)"#.to_string(),
         },
-        // Demo 8: Stack Variables
+        // Demo 7: Stack Variables
         RustExample {
             name: "Stack Variables".to_string(),
             description: "Local variables and register spilling".to_string(),
@@ -2200,6 +2103,103 @@ uart_putc:
     la      r2, mmio_write
     jmp     (r2)
     .Lret_30:
+    pop     r2
+    jmp     (r2)"#.to_string(),
+        },
+        // Demo 8: UART Hello World
+        RustExample {
+            name: "UART Hello".to_string(),
+            description: "Write \"Hello\\n\" to UART output".to_string(),
+            rust_source: r#"#[inline(never)]
+pub unsafe fn uart_putc(ch: u16) {
+    mmio_write(UART_DATA, ch);
+}
+
+#[no_mangle]
+pub unsafe fn demo_uart_hello() {
+    uart_putc(b'H' as u16);
+    uart_putc(b'e' as u16);
+    uart_putc(b'l' as u16);
+    uart_putc(b'l' as u16);
+    uart_putc(b'o' as u16);
+    uart_putc(b'\n' as u16);
+    loop {}  // halt
+}"#.to_string(),
+            msp430_asm: r#"demo_uart_hello:
+	mov	#72, r12          ; 'H'
+	call	#uart_putc
+	mov	#101, r12         ; 'e'
+	call	#uart_putc
+	mov	#108, r12         ; 'l'
+	call	#uart_putc
+	mov	#108, r12         ; 'l'
+	call	#uart_putc
+	mov	#111, r12         ; 'o'
+	call	#uart_putc
+	mov	#10, r12          ; '\n'
+	call	#uart_putc
+.LBB10_1:
+	jmp	.LBB10_1
+
+uart_putc:
+	mov	r12, r13
+	mov	#-255, r12        ; UART_DATA
+	call	#mmio_write
+	ret"#.to_string(),
+            cor24_assembly: r#"; --- demo_uart_hello: send "Hello\n" via UART ---
+demo_uart_hello:
+    lc      r0, 72            ; 'H'
+    la      r2, .Lret_20
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_20:
+    lc      r0, 101           ; 'e'
+    la      r2, .Lret_21
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_21:
+    lc      r0, 108           ; 'l'
+    la      r2, .Lret_22
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_22:
+    lc      r0, 108           ; 'l'
+    la      r2, .Lret_23
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_23:
+    lc      r0, 111           ; 'o'
+    la      r2, .Lret_24
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_24:
+    lc      r0, 10            ; '\n'
+    la      r2, .Lret_25
+    push    r2
+    la      r2, uart_putc
+    jmp     (r2)
+    .Lret_25:
+.LBB10_1:
+    bra     .LBB10_1
+
+uart_putc:
+    mov     r1, r0
+    la      r0, 0xFF0100
+    la      r2, .Lret_30
+    push    r2
+    la      r2, mmio_write
+    jmp     (r2)
+    .Lret_30:
+    pop     r2
+    jmp     (r2)
+
+mmio_write:
+    sw      r1, 0(r0)
     pop     r2
     jmp     (r2)"#.to_string(),
         },
