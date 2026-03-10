@@ -102,8 +102,6 @@ pub struct RustPipelineProps {
     pub on_run: Callback<()>,
     pub on_stop: Callback<()>,
     pub on_reset: Callback<()>,
-    #[prop_or_default]
-    pub on_unload: Callback<()>,
     pub cpu_state: EmulatorState,
     pub is_loaded: bool,
     pub is_running: bool,
@@ -112,8 +110,6 @@ pub struct RustPipelineProps {
     // Modal callbacks - passed from app.rs
     #[prop_or_default]
     pub on_tutorial_open: Callback<()>,
-    #[prop_or_default]
-    pub on_examples_open: Callback<()>,
     #[prop_or_default]
     pub on_isa_ref_open: Callback<()>,
     #[prop_or_default]
@@ -161,10 +157,15 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
         })
     };
 
-    // Open load dialog
+    // Open load dialog - pre-select currently loaded example
     let on_load_dialog_open = {
         let load_dialog_open = load_dialog_open.clone();
+        let selected_example = selected_example.clone();
+        let loaded = props.loaded_example.clone();
         Callback::from(move |_| {
+            if let Some(ex) = &loaded {
+                selected_example.set(Some(ex.clone()));
+            }
             load_dialog_open.set(true);
         })
     };
@@ -253,17 +254,6 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
         }
     };
 
-    // Reset wizard to Source step (always enabled) - also unloads the example
-    let on_wizard_reset = {
-        let current_step = current_step.clone();
-        let on_unload = props.on_unload.clone();
-        let selected_example = selected_example.clone();
-        Callback::from(move |_| {
-            current_step.set(WizardStep::Source);
-            selected_example.set(None);
-            on_unload.emit(());
-        })
-    };
 
     // All wizard steps for rendering
     let all_steps = [
@@ -282,10 +272,7 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                         let cb = props.on_tutorial_open.clone();
                         Callback::from(move |_| cb.emit(()))
                     }>{"Tutorial"}</button>
-                    <button onclick={
-                        let cb = props.on_examples_open.clone();
-                        Callback::from(move |_| cb.emit(()))
-                    }>{"Examples"}</button>
+                    <button onclick={on_load_dialog_open.clone()}>{"Examples"}</button>
                     <button onclick={
                         let cb = props.on_isa_ref_open.clone();
                         Callback::from(move |_| cb.emit(()))
@@ -340,15 +327,7 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                     </button>
                 }
 
-                // Spacer to push Exit button to bottom
                 <div class="wizard-spacer"></div>
-
-                // Exit button - unloads example and returns to Source step
-                if props.is_loaded {
-                    <button class="wizard-exit-btn" onclick={on_wizard_reset}>
-                        {"Exit"}
-                    </button>
-                }
             </div>
 
             // Column 3: Notebook cells

@@ -754,15 +754,6 @@ pub fn app() -> Html {
     };
 
     // Rust pipeline: Unload (clear loaded state)
-    let on_rust_unload = {
-        let rust_is_loaded = rust_is_loaded.clone();
-        let rust_loaded_example = rust_loaded_example.clone();
-        Callback::from(move |()| {
-            rust_is_loaded.set(false);
-            rust_loaded_example.set(None);
-        })
-    };
-
     // Tab definitions
     let tabs = vec![
         Tab { id: "assembler".to_string(), label: "Assembler".to_string() },
@@ -886,7 +877,6 @@ pub fn app() -> Html {
                     on_run={on_rust_run}
                     on_stop={on_rust_stop}
                     on_reset={on_rust_reset}
-                    on_unload={on_rust_unload}
                     cpu_state={(*rust_emu_state).clone()}
                     is_loaded={*rust_is_loaded}
                     is_running={*rust_is_running}
@@ -895,10 +885,6 @@ pub fn app() -> Html {
                     on_tutorial_open={
                         let tutorial_open = tutorial_open.clone();
                         Callback::from(move |_| tutorial_open.set(true))
-                    }
-                    on_examples_open={
-                        let examples_open = examples_open.clone();
-                        Callback::from(move |_| examples_open.set(true))
                     }
                     on_isa_ref_open={
                         let isa_ref_open = isa_ref_open.clone();
