@@ -146,11 +146,13 @@ pub fn debug_panel(props: &DebugPanelProps) -> Html {
             <div class="debug-controls">
                 <span class="debug-controls-label">{"Emulator:"}</span>
                 <button class="step-btn" onclick={on_exec_step}
-                    disabled={!props.is_loaded || state.is_halted || props.is_running}>
+                    disabled={!props.is_loaded || state.is_halted || props.is_running}
+                    data-tooltip="Execute instructions (use multiplier to step multiple)">
                     {"Step"}
                 </button>
                 <select class="step-count-select" onchange={on_step_count_change}
-                    disabled={props.is_running}>
+                    disabled={props.is_running}
+                    data-tooltip="Instructions per Step click">
                     <option value="1" selected={*step_count == 1}>{"×1"}</option>
                     <option value="10" selected={*step_count == 10}>{"×10"}</option>
                     <option value="100" selected={*step_count == 100}>{"×100"}</option>
@@ -159,17 +161,20 @@ pub fn debug_panel(props: &DebugPanelProps) -> Html {
                     <option value="100000" selected={*step_count == 100000}>{"×100K"}</option>
                 </select>
                 if props.is_running {
-                    <button class="stop-btn" onclick={on_stop_click}>
+                    <button class="stop-btn" onclick={on_stop_click}
+                        data-tooltip="Stop continuous execution">
                         {"Stop"}
                     </button>
                 } else {
                     <button class="run-btn" onclick={on_run_click}
-                        disabled={!props.is_loaded || state.is_halted}>
+                        disabled={!props.is_loaded || state.is_halted}
+                        data-tooltip="Run continuously until halt or stop">
                         {"Run"}
                     </button>
                 }
                 <button class="reset-btn" onclick={on_reset_click}
-                    disabled={!props.is_loaded || props.is_running}>
+                    disabled={!props.is_loaded || props.is_running}
+                    data-tooltip="Reset CPU to initial state">
                     {"Reset"}
                 </button>
             </div>
@@ -235,18 +240,18 @@ pub fn debug_panel(props: &DebugPanelProps) -> Html {
                                 format!("0x{:06X}", val)
                             };
                             html! {
-                                <div class={row_class} title={tooltip}>
-                                    <span class="reg-name">{name}<span class="reg-tip">{"?"}</span></span>
+                                <div class={row_class} data-tooltip={tooltip}>
+                                    <span class="reg-name">{name}</span>
                                     <span class="reg-value">{value_str}</span>
                                 </div>
                             }
                         })}
-                        <div class="register-entry" title="Program counter">
-                            <span class="reg-name">{"PC"}<span class="reg-tip">{"?"}</span></span>
+                        <div class="register-entry" data-tooltip="Program counter">
+                            <span class="reg-name">{"PC"}</span>
                             <span class="reg-value">{format!("0x{:06X}", state.pc)}</span>
                         </div>
-                        <div class="register-entry" title="Condition flag (set by compare instructions)">
-                            <span class="reg-name">{"C"}<span class="reg-tip">{"?"}</span></span>
+                        <div class="register-entry" data-tooltip="Condition flag (set by compare instructions)">
+                            <span class="reg-name">{"C"}</span>
                             <span class="reg-value">{if state.condition_flag { "1" } else { "0" }}</span>
                         </div>
                     </div>
@@ -259,7 +264,7 @@ pub fn debug_panel(props: &DebugPanelProps) -> Html {
                     // I/O: Switch and LED
                     <div class="debug-io">
                         <div class="peripheral-section-inline">
-                            <div class={switch_class} onclick={on_switch_click} title="Click to toggle button S2">
+                            <div class={switch_class} onclick={on_switch_click} data-tooltip="Click to toggle button S2">
                                 {"S2"}
                             </div>
                             <span class="io-inline-status">{switch_status}</span>

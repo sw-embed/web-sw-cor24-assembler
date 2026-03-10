@@ -4,22 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build Commands
 
-**Always use scripts, not raw commands, for building and serving.** This ensures consistent flags (e.g. `--release`, `--port`) and clean-build support.
+**CRITICAL: NEVER run `trunk` commands directly.** Always use the shell scripts below. Running bare `trunk serve` or `trunk build` with wrong flags breaks the build (wrong port, missing `--release`, wrong `--public-url`). The scripts encode the correct arguments.
 
 ```bash
-# Local preview with hot reload (http://localhost:7401/cor24-rs/)
+# Dev server with hot reload (http://localhost:7401/cor24-rs/)
 ./serve.sh              # incremental build + serve
-./serve.sh --clean      # clean build + serve
+./serve.sh --clean      # clean build + serve (use after strange build errors)
 
 # Production build (outputs to pages/)
 ./build.sh              # incremental build
 ./build.sh --clean      # clean build
 
-# Run tests
+# Run tests (OK to run cargo directly for non-build commands)
 cargo test
 
-# Check compilation without building
+# Check compilation (OK to run cargo directly)
 cargo check
+cargo check --target wasm32-unknown-unknown   # checks WASM-only code too
+cargo clippy --target wasm32-unknown-unknown  # lint check
 ```
 
 Prerequisites: Rust 1.75+, Trunk (`cargo install trunk`), `rustup target add wasm32-unknown-unknown`.

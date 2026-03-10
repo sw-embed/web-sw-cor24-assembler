@@ -213,19 +213,19 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
             // Column 1: Sidebar with buttons and peripherals
             <div class="wizard-sidebar">
                 <div class="wizard-buttons">
-                    <button onclick={
+                    <button data-tooltip="Step-by-step guide to the Rust pipeline" onclick={
                         let cb = props.on_tutorial_open.clone();
                         Callback::from(move |_| cb.emit(()))
                     }>{"Tutorial"}</button>
-                    <button onclick={
+                    <button data-tooltip="Load a pre-built Rust example" onclick={
                         let cb = props.on_examples_open.clone();
                         Callback::from(move |_| cb.emit(()))
                     }>{"Examples"}</button>
-                    <button onclick={
+                    <button data-tooltip="COR24 instruction set reference" onclick={
                         let cb = props.on_isa_ref_open.clone();
                         Callback::from(move |_| cb.emit(()))
                     }>{"ISA Ref"}</button>
-                    <button onclick={
+                    <button data-tooltip="Help and keyboard shortcuts" onclick={
                         let cb = props.on_help_open.clone();
                         Callback::from(move |_| cb.emit(()))
                     }>{"Help"}</button>

@@ -25,7 +25,7 @@ pub fn sidebar(props: &SidebarProps) -> Html {
                 html! {
                     <button
                         {onclick}
-                        title={title}
+                        data-tooltip={title}
                     >
                         {&btn.emoji}{" "}{&btn.label}
                     </button>
