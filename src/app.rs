@@ -32,6 +32,8 @@ pub fn app() -> Html {
     let rust_shared_switches = use_mut_ref(|| Rc::new(Cell::new(0u8)));
     // Shared UART input queue for Rust tab - run loop drains this each tick
     let rust_uart_queue = use_mut_ref(|| Rc::new(RefCell::new(VecDeque::<u8>::new())));
+    // Shared flag for UART clear during animated run
+    let rust_uart_clear_flag = use_mut_ref(|| Rc::new(Cell::new(false)));
 
     // State management
     let cpu = use_state(WasmCpu::new);
@@ -55,6 +57,8 @@ pub fn app() -> Html {
     let shared_switches = use_mut_ref(|| Rc::new(Cell::new(0u8)));
     // Shared UART input queue for assembler tab - run loop drains this each tick
     let asm_uart_queue = use_mut_ref(|| Rc::new(RefCell::new(VecDeque::<u8>::new())));
+    // Shared flag for UART clear during animated run
+    let asm_uart_clear_flag = use_mut_ref(|| Rc::new(Cell::new(false)));
 
     // Modal states
     let tutorial_open = use_state(|| false);
@@ -215,11 +219,13 @@ pub fn app() -> Html {
         let stop_flag = asm_stop_requested.borrow().clone();
         let switches = shared_switches.borrow().clone();
         let uart_q = asm_uart_queue.borrow().clone();
+        let uart_clear = asm_uart_clear_flag.borrow().clone();
 
         Callback::from(move |()| {
             // Start animated run
             asm_is_running.set(true);
             stop_flag.set(false);
+            uart_clear.set(false);
 
             // Initialize shared switch state from current CPU
             switches.set((*cpu).get_switches());
@@ -231,6 +237,7 @@ pub fn app() -> Html {
             let stop_handle = stop_flag.clone();
             let switch_handle = switches.clone();
             let uart_handle = uart_q.clone();
+            let uart_clear_handle = uart_clear.clone();
             let current_cpu = (*cpu).clone();
 
             // Start the animated run loop
@@ -244,6 +251,7 @@ pub fn app() -> Html {
                 stop_handle: Rc<Cell<bool>>,
                 switch_handle: Rc<Cell<u8>>,
                 uart_handle: Rc<RefCell<VecDeque<u8>>>,
+                uart_clear_handle: Rc<Cell<bool>>,
                 cumulative_led_on: u64,
             ) {
                 // Check if stop was requested (immediate - no state delay)
@@ -257,6 +265,12 @@ pub fn app() -> Html {
                         </div>
                     }));
                     return;
+                }
+
+                // Check if UART clear was requested
+                if uart_clear_handle.get() {
+                    uart_clear_handle.set(false);
+                    current_cpu.clear_uart_output();
                 }
 
                 // Read switch state from shared Rc<Cell> (updated by switch onclick)
@@ -317,14 +331,14 @@ pub fn app() -> Html {
                 } else {
                     // Continue running - 50ms delay allows browser to process input events
                     gloo::timers::callback::Timeout::new(50, move || {
-                        run_step(current_cpu, cpu_handle, output_handle, running_handle, state_handle, stop_handle, switch_handle, uart_handle, total_on);
+                        run_step(current_cpu, cpu_handle, output_handle, running_handle, state_handle, stop_handle, switch_handle, uart_handle, uart_clear_handle, total_on);
                     }).forget();
                 }
             }
 
             // Start the first step
             gloo::timers::callback::Timeout::new(0, move || {
-                run_step(current_cpu, cpu_handle, output_handle, running_handle, state_handle, stop_handle, switch_handle, uart_handle, 0);
+                run_step(current_cpu, cpu_handle, output_handle, running_handle, state_handle, stop_handle, switch_handle, uart_handle, uart_clear_handle, 0);
             }).forget();
         })
     };
@@ -516,11 +530,13 @@ pub fn app() -> Html {
         let switch_state = rust_shared_switches.clone();
         let switch_value = rust_switch_value.clone();
         let uart_q = rust_uart_queue.borrow().clone();
+        let uart_clear = rust_uart_clear_flag.borrow().clone();
 
         Callback::from(move |()| {
             // Clear stop flag and sync switch state
             stop_flag.borrow().set(false);
             switch_state.borrow().set(*switch_value);
+            uart_clear.set(false);
 
             rust_is_running.set(true);
             let cpu_handle = rust_cpu.clone();
@@ -541,6 +557,7 @@ pub fn app() -> Html {
             let stop_flag = Rc::clone(&stop_flag.borrow());
             let switch_state = Rc::clone(&switch_state.borrow());
             let uart_handle = uart_q.clone();
+            let uart_clear_flag = uart_clear.clone();
 
             // Run with animation using timer
             gloo::timers::callback::Timeout::new(50, move || {
@@ -565,6 +582,7 @@ pub fn app() -> Html {
                     stop_flag: Rc<Cell<bool>>,
                     switch_state: Rc<Cell<u8>>,
                     uart_handle: Rc<RefCell<VecDeque<u8>>>,
+                    uart_clear_handle: Rc<Cell<bool>>,
                     cumulative_led_on: u64,
                 ) {
                     // Check stop flag
@@ -572,6 +590,12 @@ pub fn app() -> Html {
                         cpu_handle.set(current_cpu);
                         running.set(false);
                         return;
+                    }
+
+                    // Check if UART clear was requested
+                    if uart_clear_handle.get() {
+                        uart_clear_handle.set(false);
+                        current_cpu.clear_uart_output();
                     }
 
                     // Sync switch state before execution
@@ -675,12 +699,12 @@ pub fn app() -> Html {
                         let state = state.clone();
                         let asm_lines = asm_lines.clone();
                         gloo::timers::callback::Timeout::new(30, move || {
-                            run_step(current_cpu, cpu_handle, running, state, asm_lines, next_prev_regs, next_prev_prev_regs, next_prev_mem_low, next_prev_mem_io_led, next_prev_mem_io_uart, next_prev_mem_stack, next_prev_prev_mem_low, next_prev_prev_mem_io_led, next_prev_prev_mem_io_uart, next_prev_prev_mem_stack, steps + 500, stop_flag, switch_state, uart_handle, next_led_on);
+                            run_step(current_cpu, cpu_handle, running, state, asm_lines, next_prev_regs, next_prev_prev_regs, next_prev_mem_low, next_prev_mem_io_led, next_prev_mem_io_uart, next_prev_mem_stack, next_prev_prev_mem_low, next_prev_prev_mem_io_led, next_prev_prev_mem_io_uart, next_prev_prev_mem_stack, steps + 500, stop_flag, switch_state, uart_handle, uart_clear_handle, next_led_on);
                         }).forget();
                     }
                 }
 
-                run_step(initial_cpu, cpu_handle, running, state, asm_lines, prev_regs, prev_prev_regs, prev_mem_low, prev_mem_io_led, prev_mem_io_uart, prev_mem_stack, prev_prev_mem_low, prev_prev_mem_io_led, prev_prev_mem_io_uart, prev_prev_mem_stack, 0, stop_flag, switch_state, uart_handle, 0);
+                run_step(initial_cpu, cpu_handle, running, state, asm_lines, prev_regs, prev_prev_regs, prev_mem_low, prev_mem_io_led, prev_mem_io_uart, prev_mem_stack, prev_prev_mem_low, prev_prev_mem_io_led, prev_prev_mem_io_uart, prev_prev_mem_stack, 0, stop_flag, switch_state, uart_handle, uart_clear_flag, 0);
             }).forget();
         })
     };
@@ -848,12 +872,19 @@ pub fn app() -> Html {
     let on_asm_uart_clear = {
         let cpu = cpu.clone();
         let asm_emu_state = asm_emu_state.clone();
+        let asm_is_running = asm_is_running.clone();
+        let clear_flag = asm_uart_clear_flag.borrow().clone();
         Callback::from(move |()| {
-            let mut new_cpu = (*cpu).clone();
-            new_cpu.clear_uart_output();
-            let state = capture_cpu_state(&new_cpu, &asm_emu_state);
-            asm_emu_state.set(state);
-            cpu.set(new_cpu);
+            if *asm_is_running {
+                // During animated run, signal the run loop to clear
+                clear_flag.set(true);
+            } else {
+                let mut new_cpu = (*cpu).clone();
+                new_cpu.clear_uart_output();
+                let state = capture_cpu_state(&new_cpu, &asm_emu_state);
+                asm_emu_state.set(state);
+                cpu.set(new_cpu);
+            }
         })
     };
 
@@ -861,12 +892,18 @@ pub fn app() -> Html {
     let on_rust_uart_clear = {
         let rust_cpu = rust_cpu.clone();
         let rust_emu_state = rust_emu_state.clone();
+        let rust_is_running = rust_is_running.clone();
+        let clear_flag = rust_uart_clear_flag.borrow().clone();
         Callback::from(move |()| {
-            let mut cpu = (*rust_cpu).clone();
-            cpu.clear_uart_output();
-            let state = capture_cpu_state(&cpu, &rust_emu_state);
-            rust_emu_state.set(state);
-            rust_cpu.set(cpu);
+            if *rust_is_running {
+                clear_flag.set(true);
+            } else {
+                let mut cpu = (*rust_cpu).clone();
+                cpu.clear_uart_output();
+                let state = capture_cpu_state(&cpu, &rust_emu_state);
+                rust_emu_state.set(state);
+                rust_cpu.set(cpu);
+            }
         })
     };
 
