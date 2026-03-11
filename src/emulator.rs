@@ -656,4 +656,92 @@ mod tests {
         assert_eq!(lines[2].0, 2);
         assert!(lines[2].1.contains("lc"));
     }
+
+    /// Reproduce web UI pattern: single-step loop with UART send between ticks
+    #[test]
+    fn test_echo_via_single_step_loop() {
+        use crate::assembler::Assembler;
+
+        let source = include_str!("../docs/examples/echo.s");
+        let mut asm = Assembler::new();
+        let result = asm.assemble(source);
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+
+        let mut emu = EmulatorCore::new();
+        for (addr, &byte) in result.bytes.iter().enumerate() {
+            emu.write_byte(addr as u32, byte);
+        }
+        emu.set_pc(0);
+
+        // Simulate web UI exactly: step() which toggles paused each call
+        fn run_tick(emu: &mut EmulatorCore, steps: u32) {
+            for _ in 0..steps {
+                if emu.is_halted() { break; }
+                let r = emu.step();
+                if matches!(r.reason, StopReason::Halted | StopReason::InvalidInstruction(_)) {
+                    break;
+                }
+            }
+        }
+
+        // Tick 1: init — prompt should appear
+        run_tick(&mut emu, 500);
+        assert_eq!(emu.get_uart_output(), "?", "Prompt should appear");
+        assert!(!emu.is_halted(), "Should not be halted");
+
+        // Send '1' (not lowercase) and run a tick — echoes as-is
+        emu.send_uart_byte(b'1');
+        run_tick(&mut emu, 500);
+        assert_eq!(emu.get_uart_output(), "?1", "'1' should echo as-is");
+
+        // Send 'a' (lowercase) and run a tick — echoes Aa
+        emu.send_uart_byte(b'a');
+        run_tick(&mut emu, 500);
+        assert_eq!(emu.get_uart_output(), "?1Aa", "'a' should echo 'Aa'");
+    }
+
+    /// Test echo using the challenge.rs embedded source (same as web UI)
+    #[test]
+    fn test_echo_via_challenge_source() {
+        use crate::assembler::Assembler;
+        use crate::challenge::get_examples;
+
+        let examples = get_examples();
+        let echo = examples.iter().find(|(name, _, _)| name == "Echo").unwrap();
+
+        let mut asm = Assembler::new();
+        let result = asm.assemble(&echo.2);
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+
+        let mut emu = EmulatorCore::new();
+        for (addr, &byte) in result.bytes.iter().enumerate() {
+            emu.write_byte(addr as u32, byte);
+        }
+        emu.set_pc(0);
+
+        fn run_tick(emu: &mut EmulatorCore, steps: u32) {
+            for _ in 0..steps {
+                if emu.is_halted() { break; }
+                let r = emu.step();
+                if matches!(r.reason, StopReason::Halted | StopReason::InvalidInstruction(_)) {
+                    break;
+                }
+            }
+        }
+
+        run_tick(&mut emu, 500);
+        assert_eq!(emu.get_uart_output(), "?", "Prompt");
+
+        emu.send_uart_byte(b'1');
+        run_tick(&mut emu, 500);
+        assert_eq!(emu.get_uart_output(), "?1", "'1' -> echo as-is");
+
+        emu.send_uart_byte(b'?');
+        run_tick(&mut emu, 500);
+        assert_eq!(emu.get_uart_output(), "?1?", "'?' -> echo as-is");
+
+        emu.send_uart_byte(b'a');
+        run_tick(&mut emu, 500);
+        assert_eq!(emu.get_uart_output(), "?1?Aa", "'a' -> 'Aa'");
+    }
 }

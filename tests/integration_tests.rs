@@ -299,7 +299,7 @@ fn test_interrupt_example() {
     assert_eq!(cpu.io.uart_output.len(), 2, "Should have two digits after two interrupts");
 }
 
-/// Echo example: letters echo as uppercase+lowercase, non-letters as hex
+/// Echo example: lowercase letters echo as Aa, everything else echoes as-is
 #[test]
 fn test_echo_example() {
     let source = include_str!("../docs/examples/echo.s");
@@ -318,23 +318,23 @@ fn test_echo_example() {
     executor.run(&mut cpu, 100);
     assert_eq!(cpu.io.uart_output, "?", "Prompt '?' should appear on startup");
 
-    // Send 'a' -> should echo "Aa"
+    // Send 'a' -> lowercase, should echo "Aa"
     cpu.uart_send_rx(b'a');
     executor.run(&mut cpu, 1000);
     assert_eq!(cpu.io.uart_output, "?Aa", "Lowercase 'a' should echo 'Aa'");
 
-    // Send 'B' -> should echo "Bb"
+    // Send 'B' -> not lowercase, should echo "B" as-is
     cpu.uart_send_rx(b'B');
     executor.run(&mut cpu, 1000);
-    assert_eq!(cpu.io.uart_output, "?AaBb", "'B' should echo 'Bb'");
+    assert_eq!(cpu.io.uart_output, "?AaB", "'B' should echo as-is");
 
-    // Send '?' (0x3F) -> should echo "3F"
+    // Send '1' -> not lowercase, should echo "1" as-is
+    cpu.uart_send_rx(b'1');
+    executor.run(&mut cpu, 1000);
+    assert_eq!(cpu.io.uart_output, "?AaB1", "'1' should echo as-is");
+
+    // Send '?' -> not lowercase, should echo "?" as-is
     cpu.uart_send_rx(b'?');
     executor.run(&mut cpu, 1000);
-    assert_eq!(cpu.io.uart_output, "?AaBb3F", "'?' should echo hex '3F'");
-
-    // Send '<' (0x3C) -> should echo "3C"
-    cpu.uart_send_rx(b'<');
-    executor.run(&mut cpu, 1000);
-    assert_eq!(cpu.io.uart_output, "?AaBb3F3C", "'<' should echo hex '3C'");
+    assert_eq!(cpu.io.uart_output, "?AaB1?", "'?' should echo as-is");
 }

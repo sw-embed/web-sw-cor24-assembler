@@ -78,6 +78,16 @@ pub fn program_area(props: &ProgramAreaProps) -> Html {
         })
     };
 
+    let on_input = {
+        let code = code.clone();
+        let editor_ref = editor_ref.clone();
+        Callback::from(move |_: InputEvent| {
+            if let Some(textarea) = editor_ref.cast::<HtmlTextAreaElement>() {
+                code.set(textarea.value());
+            }
+        })
+    };
+
     html! {
         <div class="program-area">
             <div class="panel-title">{"Program Editor"}</div>
@@ -88,6 +98,7 @@ pub fn program_area(props: &ProgramAreaProps) -> Html {
                 id="programEditor"
                 placeholder="Enter assembly code here..."
                 value={(*code).clone()}
+                oninput={on_input}
             />
 
             // Controls (middle)
