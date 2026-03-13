@@ -1,0 +1,61 @@
+Assembled 297 bytes
+Running (speed: max IPS, time limit: 5s)...
+
+LEDs: [91m●[0m[91m●[0m○○[91m●[0m○○○  (0xC8)  [UART TX @ 154] 'B'  (0x42)
+[UART TX @ 154] ''  (0x83)
+[UART TX @ 154] 'Å'  (0xC5)
+[UART TX @ 154] 'H'  (0x48)
+[UART TX @ 154] ''  (0x0D)
+
+UART output: BÅH
+
+Executed 154 instructions
+CPU halted (self-branch detected)
+
+=== Registers ===
+  PC:  0x0000EA    C: 0
+  r0:  0xFF0100  (16711936)
+  r1:  0xE95A0D  (15292941)
+  r2:  0x0000EA  (     234)
+  fp:  0x000000
+  sp:  0xFEEBEB
+
+=== Emulator ===
+  Instructions: 154
+  Halted: true
+
+=== SRAM 000000-0FFFFF (1 MB) ===
+  000000: 29 0E 01 00 26 44 42 2B 1D 0D 5A E9 48 D8 91 C5  |)...&DB+..Z.H...|
+  000010: 81 57 83 56 3A 00 00 7F 2B 18 01 00 28 44 4E 2B  |.W.V:...+...(DN+|
+  000020: 29 00 00 7F 2B 18 01 00 28 44 49 2B 35 00 00 7F  |)...+...(DI+5...|
+  000030: 2B 18 01 00 28 44 43 2B 41 00 00 7F 2B 18 01 00  |+...(DC+A...+...|
+  000040: 28 44 0A 2B 4D 00 00 7F 2B 18 01 00 28 13 FC 4D  |(D.+M...+...(..M|
+  000050: 06 7D 4D 09 7D 4D 0C 7D 4D 0F 7D 4D 12 7D A6 12  |.}M.}M.}M.}M.}..|
+  000060: 4D 12 A6 06 4D 06 09 01 A6 06 4D 12 51 06 01 A6  |M...M.....M.Q...|
+  000070: 12 4D 12 A6 0F 4D 0F 51 06 01 A6 0F 51 12 4D 06  |.M...M.Q....Q.M.|
+  000080: BA 4D 0F BA 4D 0F A6 0C 4D 0C 51 12 01 A6 0C 4D  |.M..M...M.Q....M|
+  000090: 0C BA 4D 0C A6 09 4D 09 51 0F 01 A6 09 4D 09 BA  |..M...M.Q....M..|
+  0000A0: 29 00 00 FF 2B AE 00 00 7F 2B 0A 01 00 28 4D 06  |)...+....+...(M.|
+  0000B0: 2B BA 00 00 7F 2B 18 01 00 28 4D 12 2B C6 00 00  |+....+...(M.+...|
+  0000C0: 7F 2B 18 01 00 28 4D 0F 2B D2 00 00 7F 2B 18 01  |.+...(M.+....+..|
+  0000D0: 00 28 4D 0C 2B DE 00 00 7F 2B 18 01 00 28 4D 09  |.(M.+....+...(M.|
+  0000E0: 2B EA 00 00 7F 2B 18 01 00 28 13 FC 29 00 00 FF  |+....+...(..)...|
+  0000F0: 2B FA 00 00 7F 2B 06 01 00 28 09 01 2B 06 01 00  |+....+...(..+...|
+  000100: 7F 2B 4F 00 00 28 4A 00 7B 28 A7 00 7B 28 2B 18  |.+O..(J.{(..{(+.|
+  000110: 01 00 7F 2B EC 00 00 28 5A 29 00 01 FF 2B 27 01  |...+...(Z)...+'.|
+  000120: 00 7F 2B 0A 01 00 28 7B 28 00 00 00 00 00 00 00  |..+...({(.......|
+  000130..0FFFFF: 1048272 bytes all zero
+
+=== Unmapped 100000-FEDDFF (14.9 MB, not installed) ===
+
+=== EBR FEE000-FEFFFF (8 KB, stack) ===
+  FEE000..FEEBDF: 3040 bytes all zero
+  FEEBE0: 00 00 00 00 00 27 01 00 EA 00 00 41 2B 1D 00 28  |.....'.....A+..(|
+  FEEBF0: 44 2B 18 01 00 00 7F 50 2B 11 06 01 00 18 01 00  |D+.....P+.......|
+  FEEC00..FEFFFF: 5120 bytes all zero
+
+=== I/O FF0000-FFFFFF (64 KB, memory-mapped peripherals) ===
+  FF0000 LED:  0xC8  [**..*...]  BTN S2: released
+  FF0010 IntEn:  0x00  UART RX IRQ: disabled
+  FF0100 UART:   status=0x02  RX ready: no  CTS: yes  TX busy: no
+  UART TX log:   "BÅH\r"

@@ -279,6 +279,10 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
                         let cb = props.on_help_open.clone();
                         Callback::from(move |_| cb.emit(()))
                     }>{"Help"}</button>
+                    <a href="https://software-wrighter-lab.github.io/" target="_blank" rel="noopener"
+                       class="sidebar-link" data-tooltip="SW-Lab Blog">{"Blog"}</a>
+                    <a href="https://discord.com/invite/Ctzk5uHggZ" target="_blank" rel="noopener"
+                       class="sidebar-link" data-tooltip="SW-Lab Discord">{"Discord"}</a>
                 </div>
 
                 // LED and Switch are shown in the DebugPanel

@@ -2,7 +2,8 @@
 ; Pipeline: Rust -> rustc (msp430-none-elf) -> MSP430 ASM -> COR24 ASM
 
 ; Reset vector -> demo_uart_hello
-    bra     demo_uart_hello
+    la      r0, demo_uart_hello
+    jmp     (r0)
 
 ; --- function: _RNvCsgMG9zBUy57e_7___rustc17rust_begin_unwind ---
 _RNvCsgMG9zBUy57e_7___rustc17rust_begin_unwind:

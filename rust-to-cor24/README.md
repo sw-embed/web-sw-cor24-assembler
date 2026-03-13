@@ -62,53 +62,66 @@ execute the panic handler (an infinite loop), not our demo.
 
 ### The Solution: Reset Vector Prologue
 
-The `msp430-to-cor24` translator emits a **branch instruction at address 0** that
-jumps to the entry point function:
+The `msp430-to-cor24` translator emits an **absolute jump at address 0** that
+jumps to the `start` function. It uses `la`+`jmp` instead of `bra` because
+`bra` has a ±127 byte offset limit:
 
 ```asm
-; Reset vector -> demo_blinky
-    bra     demo_blinky          ; 4 bytes at address 0x000000
+; Reset vector -> start
+    la      r0, start            ; 4 bytes at address 0x000000
+    jmp     (r0)                 ; 2 bytes at address 0x000004
 
 ; --- function: _RN...rust_begin_unwind ---   (panic handler)
 _RN...rust_begin_unwind:
-.LBB0_1:
-    bra     .LBB0_1              ; infinite loop (never reached in normal execution)
+    ...                          ; writes "PANIC\n" to UART, then infinite loop
 
-; --- function: delay ---
-delay:
-    ...
-
-; --- function: demo_blinky ---              ; ← CPU jumps here from address 0
+; --- function: demo_blinky ---
 demo_blinky:
     la      r0, 0xFF0000
     lc      r1, 1
     ...
+
+; --- function: start ---                    ; ← CPU jumps here from address 0
+start:
+    jal     r1, demo_blinky      ; call the demo function
 ```
 
 This mirrors how real microcontrollers work: the hardware reset vector at address 0
 contains a jump to the startup code.
 
+### The `start` Convention
+
+Every COR24 program compiled from Rust uses a fixed entry point convention:
+
+```rust
+#[no_mangle]
+pub unsafe fn start() -> ! {
+    demo_blinky()       // calls the per-program named function
+}
+```
+
+The `start()` function is the bridge between the CPU reset and the program logic.
+Each program has exactly one `start()` that calls its main function.
+
 ### How the Entry Point is Identified
 
-1. **Explicit `--entry <func>` flag** (preferred for multi-function files):
-   ```bash
-   msp430-to-cor24 demos.msp430.s --entry demo_blinky -o demo_blinky.cor24.s
-   ```
+1. **Convention (default)**: The translator looks for a `start` label. If the input
+   has `.globl` directives (i.e., comes from `rustc`) but no `start` label, it
+   returns an error listing the available labels.
 
-2. **Auto-detection** from `.globl` directives in the MSP430 assembly:
-   - First: looks for any symbol starting with `demo_` or named `main`
-   - Fallback: first non-mangled, non-helper symbol
-   - Skips: mangled names (`_RN...`), known helpers (`mmio_write`, `delay`, etc.)
+2. **Explicit `--entry <func>` flag** (optional override):
+   ```bash
+   msp430-to-cor24 input.msp430.s --entry my_entry -o output.cor24.s
+   ```
+   Only needed if a program can't use `start` for some reason.
 
 3. **No `.globl` directives** (e.g., hand-written single-function tests):
    - No prologue emitted — first instruction is at address 0 (legacy behavior)
 
 ### In the Rust Source
 
-The entry point is the function marked `#[no_mangle]` with a `demo_` prefix:
-
 ```rust
-#[no_mangle]                    // prevents name mangling → linker-visible symbol
+#[no_mangle]
 pub unsafe fn demo_blinky() -> ! {
     loop {
         mmio_write(LED_ADDR, 1);
@@ -117,10 +130,15 @@ pub unsafe fn demo_blinky() -> ! {
         delay(5000);
     }
 }
+
+#[no_mangle]
+pub unsafe fn start() -> ! {
+    demo_blinky()
+}
 ```
 
-The `#[no_mangle]` attribute makes the function visible as `.globl demo_blinky` in
-the MSP430 assembly output. The translator then recognizes it as the entry point.
+The `#[no_mangle]` attribute makes both functions visible as `.globl` symbols in
+the MSP430 assembly output. The translator finds `start` and emits the prologue.
 
 ## Register Mapping
 
@@ -151,13 +169,16 @@ const UART_DATA: u16 = 0xFF01;    // → 0xFF0100 after translation
 ## CLI Usage
 
 ```bash
-# Translate a single MSP430 .s file to COR24 assembly
-msp430-to-cor24 input.msp430.s --entry demo_blinky -o output.cor24.s
+# Translate MSP430 .s to COR24 assembly (uses start convention by default)
+msp430-to-cor24 input.msp430.s -o output.cor24.s
+
+# Override entry point (rare — only if start can't be used)
+msp430-to-cor24 input.msp430.s --entry my_entry -o output.cor24.s
 
 # Compile a Rust project end-to-end
-msp430-to-cor24 --compile path/to/rust/project --entry demo_blinky
+msp430-to-cor24 --compile path/to/rust/project
 
-# Run built-in test case (no entry prologue needed — single functions)
+# Run built-in test case
 msp430-to-cor24 --test
 ```
 
@@ -174,7 +195,7 @@ rustup target add msp430-none-elf --toolchain nightly
 |-----------|--------|-------------|
 | `.rs` | Rust source | `#![no_std]`, `#[panic_handler]`, `#[no_mangle]` on entry |
 | `.msp430.s` | MSP430 asm text | Output of `rustc --emit asm`, `.section .text.<func>` per function |
-| `.cor24.s` | COR24 asm text | `bra <entry>` prologue + translated instructions + labels |
+| `.cor24.s` | COR24 asm text | `la+jmp start` prologue + translated instructions + labels |
 | (in-memory) | `Vec<u8>` | Raw bytes from COR24 assembler, loaded at address 0 |
 
 ## Project Structure
@@ -198,9 +219,10 @@ rust-to-cor24/
 
 ## Conventions
 
-1. **Entry point naming**: Functions named `demo_*` or `main` are recognized as entry points
-2. **`#[no_mangle]`**: Required on entry point and all functions called across translation units
+1. **`start` entry point**: Every program has `#[no_mangle] pub unsafe fn start()` that calls the main function
+2. **`#[no_mangle]`**: Required on `start`, entry functions, and all functions called across translation units
 3. **`#[inline(never)]`**: Required on helper functions to prevent inlining (which would eliminate the callable function)
 4. **`#![no_std]` + `#[panic_handler]`**: Required — no standard library on bare metal
-5. **Reset vector**: The `bra <entry>` at address 0 is the COR24 equivalent of a hardware reset vector
-6. **Halt convention**: `loop {}` in Rust compiles to a self-branch (`bra .`), detected by the emulator as halt
+5. **Panic handler**: Writes "PANIC\n" to UART before entering infinite loop
+6. **Reset vector**: `la r0, start` + `jmp (r0)` at address 0 — the COR24 equivalent of a hardware reset vector
+7. **Halt convention**: `loop {}` in Rust compiles to a self-branch (`bra .`), detected by the emulator as halt

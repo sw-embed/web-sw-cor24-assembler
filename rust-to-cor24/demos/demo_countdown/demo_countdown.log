@@ -1,0 +1,46 @@
+Assembled 199 bytes
+Running (speed: max IPS, time limit: 5s)...
+
+LEDs: ○○○○[91m●[0m○○[91m●[0m  (0x09)  LEDs: ○○○○○[91m●[0m[91m●[0m[91m●[0m  (0x07)  LEDs: ○○○○○[91m●[0m[91m●[0m○  (0x06)  LEDs: ○○○○○[91m●[0m○○  (0x04)  LEDs: ○○○○○○[91m●[0m○  (0x02)  LEDs: ○○○○○○○[91m●[0m  (0x01)  LEDs: ○○○○○○○○  (0x00)  
+Executed 60289 instructions
+CPU halted (self-branch detected)
+
+=== Registers ===
+  PC:  0x0000A6    C: 1
+  r0:  0xFF0000  (16711680)
+  r1:  0x000000  (       0)
+  r2:  0x0000A6  (     166)
+  fp:  0x000000
+  sp:  0xFEEBFA
+
+=== Emulator ===
+  Instructions: 60289
+  Halted: true
+
+=== SRAM 000000-0FFFFF (1 MB) ===
+  000000: 29 AC 00 00 26 44 50 2B 11 00 00 7F 2B B6 00 00  |)...&DP+....+...|
+  000010: 28 44 00 00 00 00 00 7F 2B B6 00 00 28 44 4E 2B  |(D......+...(DN+|
+  000020: 29 00 00 7F 2B B6 00 00 28 44 49 2B 35 00 00 7F  |)...+...(DI+5...|
+  000030: 2B B6 00 00 28 44 43 2B 41 00 00 7F 2B B6 00 00  |+...(DC+A...+...|
+  000040: 28 44 0A 2B 4D 00 00 7F 2B B6 00 00 28 13 FC A2  |(D.+M...+...(...|
+  000050: 03 00 00 C8 15 0A 09 FF 61 A5 00 09 FF 45 FF 16  |........a....E..|
+  000060: 14 F4 0C 03 7B 28 4D 12 7D 44 0A A6 12 29 00 00  |....{(M.}D...)..|
+  000070: FF 51 12 2B 7D 00 00 7F 2B A8 00 00 28 29 E8 03  |.Q.+}...+...()..|
+  000080: 00 2B 8B 00 00 7F 2B 4F 00 00 28 4D 12 09 FF A6  |.+....+O..(M....|
+  000090: 12 4D 12 C8 14 D5 29 00 00 FF 45 00 2B A6 00 00  |.M....)...E.+...|
+  0000A0: 7F 2B A8 00 00 28 13 FC A7 00 7B 28 2B B6 00 00  |.+...(....{(+...|
+  0000B0: 7F 2B 66 00 00 28 5A 29 00 01 FF 2B C5 00 00 7F  |.+f..(Z)...+....|
+  0000C0: 2B A8 00 00 28 7B 28 00 00 00 00 00 00 00 00 00  |+...({(.........|
+  0000D0..0FFFFF: 1048368 bytes all zero
+
+=== Unmapped 100000-FEDDFF (14.9 MB, not installed) ===
+
+=== EBR FEE000-FEFFFF (8 KB, stack) ===
+  FEE000..FEEBEF: 3056 bytes all zero
+  FEEBF0: 00 00 00 00 00 00 00 A6 00 00 41 2B 1D B6 00 00  |..........A+....|
+  FEEC00..FEFFFF: 5120 bytes all zero
+
+=== I/O FF0000-FFFFFF (64 KB, memory-mapped peripherals) ===
+  FF0000 LED:  0x00  [........]  BTN S2: released
+  FF0010 IntEn:  0x00  UART RX IRQ: disabled
+  FF0100 UART:   status=0x02  RX ready: no  CTS: yes  TX busy: no

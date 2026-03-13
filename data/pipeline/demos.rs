@@ -12,6 +12,15 @@
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
+    // Write "PANIC\n" to UART before halting
+    unsafe {
+        uart_putc(b'P' as u16);
+        uart_putc(b'A' as u16);
+        uart_putc(b'N' as u16);
+        uart_putc(b'I' as u16);
+        uart_putc(b'C' as u16);
+        uart_putc(b'\n' as u16);
+    }
     loop {}
 }
 
@@ -50,6 +59,16 @@ pub fn delay(mut n: u16) {
 const LED_ADDR: u16 = 0xFF00;    // maps to 0xFF0000 in COR24
 const UART_DATA: u16 = 0xFF01;   // maps to 0xFF0100 in COR24
 const UART_STAT: u16 = 0xFF02;   // maps to 0xFF0101 in COR24
+
+// ============================================================
+// Entry point convention: each standalone binary has a
+// #[no_mangle] pub unsafe fn start() that calls the demo.
+// This file contains all demos in one file for reference;
+// when compiled individually, each gets its own start().
+// Example:
+//   #[no_mangle]
+//   pub unsafe fn start() -> ! { demo_blinky() }
+// ============================================================
 
 // ============================================================
 // Demo 1: Blinky - Toggle LED with delay

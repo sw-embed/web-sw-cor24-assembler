@@ -41,7 +41,7 @@ fn main() -> Result<()> {
         "--test" => run_test(),
         "--compile" => {
             let dir = positional.get(1).map(|s| s.as_str()).unwrap_or(".");
-            compile_and_translate(dir, entry_point.as_deref())
+            compile_and_translate(dir, entry_point.as_deref().unwrap_or("start"))
         }
         "" => {
             eprintln!("Usage: msp430-to-cor24 <input.s> [-o output.s] [--entry <func>]");
@@ -51,7 +51,8 @@ fn main() -> Result<()> {
         }
         input_path => {
             let msp430_asm = fs::read_to_string(input_path)?;
-            let cor24_asm = wasm2cor24::translate_msp430(&msp430_asm, entry_point.as_deref())?;
+            let entry = entry_point.as_deref().unwrap_or("start");
+            let cor24_asm = wasm2cor24::translate_msp430(&msp430_asm, entry)?;
 
             if let Some(out_path) = output_path {
                 fs::write(&out_path, &cor24_asm)?;
@@ -207,9 +208,18 @@ shift_and_mask:
 	ret
 .Lfunc_end8:
 	.size	shift_and_mask, .Lfunc_end8-shift_and_mask
+
+	.section	.text.start,"ax",@progbits
+	.globl	start
+	.p2align	1
+	.type	start,@function
+start:
+	call	#blink_loop
+.Lfunc_end9:
+	.size	start, .Lfunc_end9-start
 "#;
 
-    let cor24_asm = wasm2cor24::translate_msp430(msp430_asm, None)?;
+    let cor24_asm = wasm2cor24::translate_msp430(msp430_asm, "start")?;
 
     println!("=== MSP430 -> COR24 Translation ===\n");
     println!("{}", cor24_asm);
@@ -238,7 +248,7 @@ shift_and_mask:
 }
 
 /// Compile a Rust project to MSP430 assembly, then translate to COR24
-fn compile_and_translate(dir: &str, entry_point: Option<&str>) -> Result<()> {
+fn compile_and_translate(dir: &str, entry_point: &str) -> Result<()> {
     use std::process::Command;
 
     eprintln!("Compiling {} to MSP430 assembly...", dir);
@@ -274,6 +284,7 @@ fn compile_and_translate(dir: &str, entry_point: Option<&str>) -> Result<()> {
 
     let msp430_asm = fs::read_to_string(&asm_path)?;
     let cor24_asm = wasm2cor24::translate_msp430(&msp430_asm, entry_point)?;
+
 
     println!("{}", cor24_asm);
 

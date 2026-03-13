@@ -13,15 +13,16 @@ UART output: %8]
 Executed 148 instructions
 CPU halted (self-branch detected)
 
-=== CPU State ===
+=== Registers ===
   PC:  0x00009D    C: 0
   r0:  0xFF0100  (16711936)
   r1:  0x926895  ( 9595029)
   r2:  0x00009D  (     157)
   fp:  0x000000
   sp:  0xFEEBEE
-  LED: 0xAD
-  Cycles: 148  Instructions: 148
+
+=== Emulator ===
+  Instructions: 148
   Halted: true
 
 === SRAM 000000-0FFFFF (1 MB) ===

@@ -20,6 +20,8 @@ pub mod loader;
 // Yew app (only for wasm32 target)
 #[cfg(target_arch = "wasm32")]
 pub mod app;
+#[cfg(target_arch = "wasm32")]
+pub mod rust_examples;
 
 // WASM bindings (only for wasm32 target)
 #[cfg(target_arch = "wasm32")]

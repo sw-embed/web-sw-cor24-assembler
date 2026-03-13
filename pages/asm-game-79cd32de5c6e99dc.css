@@ -65,6 +65,31 @@ h1 {
     background: #00b8d4;
 }
 
+.sidebar .sidebar-link,
+.wizard-buttons .sidebar-link {
+    display: block;
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 5px;
+    background: #2a3a5e;
+    color: #00d9ff;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.75em;
+    transition: background 0.2s;
+    text-decoration: none;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.sidebar .sidebar-link:hover,
+.wizard-buttons .sidebar-link:hover {
+    background: #3a4a7e;
+    color: #fff;
+}
+
 /* Generic Panel Styling */
 .panel {
     background: #16213e;

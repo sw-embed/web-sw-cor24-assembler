@@ -7,6 +7,8 @@ pub struct SidebarButton {
     pub onclick: Callback<MouseEvent>,
     #[allow(dead_code)]
     pub title: Option<String>,
+    /// If set, renders as an external link (<a>) instead of a button
+    pub href: Option<String>,
 }
 
 #[derive(Properties, PartialEq)]
@@ -20,15 +22,29 @@ pub fn sidebar(props: &SidebarProps) -> Html {
         <div class="sidebar">
             { for props.buttons.iter().map(|btn| {
                 let title = btn.title.clone().unwrap_or_else(|| btn.label.clone());
-                let onclick = btn.onclick.clone();
 
-                html! {
-                    <button
-                        {onclick}
-                        data-tooltip={title}
-                    >
-                        {&btn.emoji}{" "}{&btn.label}
-                    </button>
+                if let Some(href) = &btn.href {
+                    html! {
+                        <a
+                            href={href.clone()}
+                            target="_blank"
+                            rel="noopener"
+                            class="sidebar-link"
+                            data-tooltip={title}
+                        >
+                            {&btn.emoji}{" "}{&btn.label}
+                        </a>
+                    }
+                } else {
+                    let onclick = btn.onclick.clone();
+                    html! {
+                        <button
+                            {onclick}
+                            data-tooltip={title}
+                        >
+                            {&btn.emoji}{" "}{&btn.label}
+                        </button>
+                    }
                 }
             })}
         </div>

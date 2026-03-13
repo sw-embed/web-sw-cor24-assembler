@@ -63,11 +63,12 @@ enum MspOperand {
 
 /// Translate MSP430 assembly text to COR24 assembly text.
 ///
-/// If `entry_point` is `Some("func")`, a jump prologue is emitted at address 0
-/// so the CPU enters `func` regardless of section ordering.
-/// If `None`, auto-detects the entry point by looking for `demo_*` or `main`
-/// among `.globl` symbols. If no entry point is found, no prologue is emitted.
-pub fn translate_msp430(msp_asm: &str, entry_point: Option<&str>) -> Result<String> {
+/// Looks for the `entry_point` function (default: `"start"`) and emits a
+/// `bra <entry>` reset vector prologue at address 0. If the input has `.globl`
+/// directives (i.e., comes from rustc) but the entry label is missing, returns
+/// an error. For simple inputs without `.globl` (hand-written fragments), no
+/// prologue is emitted.
+pub fn translate_msp430(msp_asm: &str, entry_point: &str) -> Result<String> {
     let lines = parse_msp430(msp_asm)?;
 
     // Collect all labels for validation
@@ -75,40 +76,34 @@ pub fn translate_msp430(msp_asm: &str, entry_point: Option<&str>) -> Result<Stri
         if let MspLine::Label(name) = l { Some(name.as_str()) } else { None }
     }).collect();
 
-    // Validate explicit entry point exists as a label
-    if let Some(entry_name) = entry_point {
-        if !all_labels.contains(&entry_name) {
-            bail!("entry point '{}' not found in MSP430 assembly. Available labels: {}",
-                entry_name,
-                all_labels.iter()
-                    .filter(|l| !l.starts_with('.') && !l.starts_with("_RN"))
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(", "));
-        }
-    }
-
-    // Determine entry point: explicit, or auto-detect from .globl directives
     let has_globl = lines.iter().any(|l| matches!(l, MspLine::Directive(d) if d.starts_with(".globl")));
-    let entry = entry_point.map(|s| s.to_string()).or_else(|| {
-        detect_entry_point(&lines)
-    });
+    let has_entry = all_labels.contains(&entry_point);
 
-    // Warn if this looks like compiled code but has no identifiable entry point
-    if entry.is_none() && has_globl {
-        eprintln!("warning: MSP430 input has .globl symbols but no entry point detected.");
-        eprintln!("  Use --entry <func> to specify the entry point.");
-        eprintln!("  Without an entry point, execution will start at address 0 (first function).");
+    // If this is compiled code (.globl present) but entry label is missing, fail
+    if has_globl && !has_entry {
+        let available: Vec<_> = all_labels.iter()
+            .filter(|l| !l.starts_with('.') && !l.starts_with("_RN"))
+            .cloned()
+            .collect();
+        bail!("entry point '{}' not found. COR24 convention requires a \
+               #[no_mangle] pub unsafe fn {}() entry point.\n  \
+               Available labels: {}",
+            entry_point, entry_point, available.join(", "));
     }
 
     let mut out = String::new();
     out.push_str("; COR24 Assembly - Generated from MSP430 via msp430-to-cor24\n");
     out.push_str("; Pipeline: Rust -> rustc (msp430-none-elf) -> MSP430 ASM -> COR24 ASM\n\n");
 
-    // Emit reset vector: jump to entry point at address 0
-    if let Some(ref entry_name) = entry {
-        out.push_str(&format!("; Reset vector -> {}\n", entry_name));
-        out.push_str(&format!("    bra     {}\n\n", entry_name));
+    // Emit reset vector: initialize frame pointer and jump to entry point
+    // Uses la+jmp instead of bra because bra has ±127 byte range limit
+    // fp must be initialized so spill slots (positive fp offsets) point to
+    // valid writable memory above the stack (stack grows downward from sp)
+    if has_entry {
+        out.push_str(&format!("; Reset vector -> {}\n", entry_point));
+        out.push_str("    mov     fp, sp\n");
+        out.push_str(&format!("    la      r0, {}\n", entry_point));
+        out.push_str("    jmp     (r0)\n\n");
     }
 
     // Track which functions we're in for context
@@ -116,7 +111,9 @@ pub fn translate_msp430(msp_asm: &str, entry_point: Option<&str>) -> Result<Stri
     let mut _current_func: Option<String> = None;
     let mut call_label_counter: usize = 0;
 
-    for line in &lines {
+    let mut i = 0;
+    while i < lines.len() {
+        let line = &lines[i];
         match line {
             MspLine::Comment(c) => {
                 if !c.is_empty() {
@@ -139,12 +136,30 @@ pub fn translate_msp430(msp_asm: &str, entry_point: Option<&str>) -> Result<Stri
             }
             MspLine::Label(label) => {
                 if !in_text_section {
+                    i += 1;
                     continue;
                 }
                 out.push_str(&format!("{}:\n", label));
             }
             MspLine::Instruction(inst) => {
                 if !in_text_section {
+                    i += 1;
+                    continue;
+                }
+                // Tail call optimization: call + ret -> direct jump
+                if inst.mnemonic == "call" && is_followed_by_ret(&lines, i) {
+                    match translate_tail_call(inst) {
+                        Ok(cor24_lines) => {
+                            for cl in cor24_lines {
+                                out.push_str(&format!("    {}\n", cl));
+                            }
+                        }
+                        Err(e) => {
+                            out.push_str(&format!("    ; TODO: tail {} ({})\n", inst.mnemonic, e));
+                        }
+                    }
+                    // Skip past the ret instruction
+                    i = skip_to_ret(&lines, i) + 1;
                     continue;
                 }
                 match translate_instruction(inst, &mut call_label_counter) {
@@ -159,42 +174,10 @@ pub fn translate_msp430(msp_asm: &str, entry_point: Option<&str>) -> Result<Stri
                 }
             }
         }
+        i += 1;
     }
 
     Ok(out)
-}
-
-/// Auto-detect entry point from `.globl` directives in MSP430 assembly.
-/// Prefers `demo_*` or `main` functions. Skips mangled names and known helpers.
-fn detect_entry_point(lines: &[MspLine]) -> Option<String> {
-    let mut globl_names: Vec<String> = Vec::new();
-
-    for line in lines {
-        if let MspLine::Directive(d) = line {
-            if let Some(name) = d.strip_prefix(".globl\t").or_else(|| d.strip_prefix(".globl ")) {
-                let name = name.trim();
-                globl_names.push(name.to_string());
-            }
-        }
-    }
-
-    // First: look for demo_* or main
-    for name in &globl_names {
-        if name.starts_with("demo_") || name == "main" {
-            return Some(name.clone());
-        }
-    }
-
-    // Fallback: first non-mangled, non-helper globl
-    let helpers = ["mmio_write", "mmio_read", "delay", "uart_putc", "fibonacci",
-                   "accumulate", "level_a", "level_b", "level_c", "print_num"];
-    for name in &globl_names {
-        if !name.starts_with('_') && !name.starts_with(".") && !helpers.contains(&name.as_str()) {
-            return Some(name.clone());
-        }
-    }
-
-    None
 }
 
 /// Map MSP430 register number to COR24 register name.
@@ -339,10 +322,11 @@ fn translate_instruction(inst: &MspInst, call_counter: &mut usize) -> Result<Vec
             let dst = operand_to_reg(&ops[0])?;
             let mut result = Vec::new();
             if is_spill(&dst) {
-                let w = "r0";
-                let actual = load_spill(&mut result, &dst, w);
+                result.push("push    r0".to_string());
+                let actual = load_spill(&mut result, &dst, "r0");
                 result.push(format!("add     {}, 1", actual));
-                store_spill(&mut result, &dst, w);
+                store_spill(&mut result, &dst, "r0");
+                result.push("pop     r0".to_string());
             } else {
                 result.push(format!("add     {}, 1", dst));
             }
@@ -352,10 +336,11 @@ fn translate_instruction(inst: &MspInst, call_counter: &mut usize) -> Result<Vec
             let dst = operand_to_reg(&ops[0])?;
             let mut result = Vec::new();
             if is_spill(&dst) {
-                let w = "r0";
-                let actual = load_spill(&mut result, &dst, w);
+                result.push("push    r0".to_string());
+                let actual = load_spill(&mut result, &dst, "r0");
                 result.push(format!("add     {}, -1", actual));
-                store_spill(&mut result, &dst, w);
+                store_spill(&mut result, &dst, "r0");
+                result.push("pop     r0".to_string());
             } else {
                 result.push(format!("add     {}, -1", dst));
             }
@@ -369,7 +354,9 @@ fn translate_instruction(inst: &MspInst, call_counter: &mut usize) -> Result<Vec
     }
 }
 
-/// Translate binary operations (add, and, or, xor) where src can be reg or imm
+/// Translate binary operations (add, and, or, xor) where src can be reg or imm.
+/// When spill registers are involved, push/pop the working register to avoid
+/// clobbering live GP values (stack-machine style).
 fn translate_binary_op(cor24_op: &str, ops: &[MspOperand], byte_mode: bool) -> Result<Vec<String>> {
     if ops.len() != 2 {
         bail!("{} requires 2 operands", cor24_op);
@@ -377,23 +364,36 @@ fn translate_binary_op(cor24_op: &str, ops: &[MspOperand], byte_mode: bool) -> R
     let dst_raw = operand_to_reg(&ops[1])?;
     let mut result = Vec::new();
 
-    // Handle spilled destination: load into working register, operate, store back
-    let (dst, dst_is_spill) = if is_spill(&dst_raw) {
-        let w = "r0";
+    // Handle spilled destination: push/save working reg, load spill, operate, store, pop/restore
+    let (dst, dst_is_spill, dst_working) = if is_spill(&dst_raw) {
+        // Pick a working register that doesn't conflict with the source GP register
+        let w = match &ops[0] {
+            MspOperand::Register(r) => {
+                match map_register(*r).unwrap_or_default().as_str() {
+                    "r0" => "r1",
+                    "r1" => "r0",
+                    _ => "r0",
+                }
+            }
+            _ => "r0",
+        };
+        result.push(format!("push    {}", w));
         let actual = load_spill(&mut result, &dst_raw, w);
-        (actual, true)
+        (actual, true, w.to_string())
     } else {
-        (dst_raw.clone(), false)
+        (dst_raw.clone(), false, String::new())
     };
 
     match &ops[0] {
         MspOperand::Register(r) => {
             let src_raw = map_register(*r)?;
             if is_spill(&src_raw) {
-                // Load spilled source into a different working register
+                // Load spilled source into a different working register, with push/pop
                 let w = if dst == "r0" { "r1" } else { "r0" };
+                result.push(format!("push    {}", w));
                 let src = load_spill(&mut result, &src_raw, w);
                 result.push(format!("{:<8}{}, {}", cor24_op, dst, src));
+                result.push(format!("pop     {}", w));
             } else {
                 result.push(format!("{:<8}{}, {}", cor24_op, dst, src_raw));
             }
@@ -425,34 +425,58 @@ fn translate_binary_op(cor24_op: &str, ops: &[MspOperand], byte_mode: bool) -> R
         result.push(format!("and     {}, {}", dst, tmp));
     }
 
-    // Store back to spill slot if needed
+    // Store back to spill slot and restore working register
     if dst_is_spill {
         store_spill(&mut result, &dst_raw, &dst);
+        result.push(format!("pop     {}", dst_working));
     }
 
     Ok(result)
 }
 
-/// Translate SUB - MSP430 sub is dst = dst - src
+/// Translate SUB - MSP430 sub is dst = dst - src.
+/// Push/pop working registers to avoid clobbering live GP values.
 fn translate_sub(ops: &[MspOperand], byte_mode: bool) -> Result<Vec<String>> {
     if ops.len() != 2 {
         bail!("sub requires 2 operands");
     }
-    let dst = operand_to_reg(&ops[1])?;
+    let dst_raw = operand_to_reg(&ops[1])?;
     let mut result = Vec::new();
+
+    let (dst, dst_is_spill, dst_working) = if is_spill(&dst_raw) {
+        let w = match &ops[0] {
+            MspOperand::Register(r) => {
+                match map_register(*r).unwrap_or_default().as_str() {
+                    "r0" => "r1",
+                    "r1" => "r0",
+                    _ => "r0",
+                }
+            }
+            _ => "r0",
+        };
+        result.push(format!("push    {}", w));
+        let actual = load_spill(&mut result, &dst_raw, w);
+        (actual, true, w.to_string())
+    } else {
+        (dst_raw.clone(), false, String::new())
+    };
 
     match &ops[0] {
         MspOperand::Register(r) => {
-            let src = map_register(*r)?;
-            result.push(format!("sub     {}, {}", dst, src));
+            let src_raw = map_register(*r)?;
+            if is_spill(&src_raw) {
+                let w = if dst == "r0" { "r1" } else { "r0" };
+                result.push(format!("push    {}", w));
+                let src = load_spill(&mut result, &src_raw, w);
+                result.push(format!("sub     {}, {}", dst, src));
+                result.push(format!("pop     {}", w));
+            } else {
+                result.push(format!("sub     {}, {}", dst, src_raw));
+            }
         }
         MspOperand::Immediate(imm) => {
-            // sub #imm, dst -> dst = dst - imm
-            // COR24: add dst, -imm  OR  load tmp + sub
             let neg = -*imm;
             if dst == "sp" {
-                // Scale MSP430 16-bit word size to COR24 24-bit word size:
-                // each 2-byte MSP430 word becomes a 3-byte COR24 word
                 let scaled = *imm * 3 / 2;
                 result.push(format!("sub     sp, {}", scaled));
             } else if (-128..=127).contains(&neg) {
@@ -466,10 +490,15 @@ fn translate_sub(ops: &[MspOperand], byte_mode: bool) -> Result<Vec<String>> {
         _ => bail!("unsupported source operand for sub"),
     }
 
-    if byte_mode {
+    if byte_mode && dst != "sp" {
         let tmp = temp_reg(&dst);
         load_immediate(&mut result, &tmp, 0xFF);
         result.push(format!("and     {}, {}", dst, tmp));
+    }
+
+    if dst_is_spill {
+        store_spill(&mut result, &dst_raw, &dst);
+        result.push(format!("pop     {}", dst_working));
     }
 
     Ok(result)
@@ -524,15 +553,17 @@ fn translate_mov(ops: &[MspOperand]) -> Result<Vec<String>> {
             if s_raw == d_raw && !is_spill(&s_raw) {
                 // Same register, no-op
             } else if is_spill(&s_raw) && is_spill(&d_raw) {
-                // Both spilled: load src into r0, store to dst
+                // Both spilled: push/pop r0 to avoid clobbering
+                result.push("push    r0".to_string());
                 load_spill(&mut result, &s_raw, "r0");
                 store_spill(&mut result, &d_raw, "r0");
+                result.push("pop     r0".to_string());
             } else if is_spill(&s_raw) {
-                // Source spilled: load into destination
+                // Source spilled: load into destination (destination IS being written)
                 let d = &d_raw;
                 load_spill(&mut result, &s_raw, d);
             } else if is_spill(&d_raw) {
-                // Destination spilled: store source into spill slot
+                // Destination spilled: store source into spill slot (no temp needed)
                 let s = &s_raw;
                 store_spill(&mut result, &d_raw, s);
             } else {
@@ -545,8 +576,11 @@ fn translate_mov(ops: &[MspOperand]) -> Result<Vec<String>> {
             // Check if this is an MSP430 I/O address that needs 24-bit mapping
             let mapped_imm = map_io_address_imm(*imm);
             if is_spill(&d_raw) {
+                // Push/pop r0 to avoid clobbering live value
+                result.push("push    r0".to_string());
                 load_immediate(&mut result, "r0", mapped_imm);
                 store_spill(&mut result, &d_raw, "r0");
+                result.push("pop     r0".to_string());
             } else {
                 load_immediate(&mut result, &d_raw, mapped_imm);
             }
@@ -605,8 +639,10 @@ fn translate_clr(ops: &[MspOperand]) -> Result<Vec<String>> {
     let dst = operand_to_reg(&ops[0])?;
     if is_spill(&dst) {
         let mut result = Vec::new();
+        result.push("push    r0".to_string());
         result.push("lc      r0, 0".to_string());
         store_spill(&mut result, &dst, "r0");
+        result.push("pop     r0".to_string());
         Ok(result)
     } else {
         Ok(vec![format!("lc      {}, 0", dst)])
@@ -628,12 +664,13 @@ fn translate_cmp(ops: &[MspOperand], byte_mode: bool) -> Result<Vec<String>> {
     let mut result = Vec::new();
     let dst_raw = operand_to_reg(&ops[1])?;
 
-    // Handle spilled destination
-    let dst = if is_spill(&dst_raw) {
+    // Handle spilled destination — push/pop to avoid clobbering
+    let (dst, dst_saved) = if is_spill(&dst_raw) {
+        result.push("push    r0".to_string());
         load_spill(&mut result, &dst_raw, "r0");
-        "r0".to_string()
+        ("r0".to_string(), true)
     } else {
-        dst_raw
+        (dst_raw, false)
     };
 
     // If byte mode, mask dst to 8 bits first
@@ -646,14 +683,15 @@ fn translate_cmp(ops: &[MspOperand], byte_mode: bool) -> Result<Vec<String>> {
     match &ops[0] {
         MspOperand::Register(r) => {
             let src_raw = map_register(*r)?;
-            let src = if is_spill(&src_raw) {
+            if is_spill(&src_raw) {
                 let w = if dst == "r0" { "r1" } else { "r0" };
+                result.push(format!("push    {}", w));
                 load_spill(&mut result, &src_raw, w);
-                w.to_string()
+                result.push(format!("clu     {}, {}", dst, w));
+                result.push(format!("pop     {}", w));
             } else {
-                src_raw
-            };
-            result.push(format!("clu     {}, {}", dst, src));
+                result.push(format!("clu     {}, {}", dst, src_raw));
+            }
         }
         MspOperand::Immediate(imm) => {
             if *imm == 0 {
@@ -670,6 +708,10 @@ fn translate_cmp(ops: &[MspOperand], byte_mode: bool) -> Result<Vec<String>> {
             }
         }
         _ => bail!("unsupported cmp source"),
+    }
+
+    if dst_saved {
+        result.push("pop     r0".to_string());
     }
 
     Ok(result)
@@ -696,8 +738,10 @@ fn translate_tst(ops: &[MspOperand]) -> Result<Vec<String>> {
     let dst = operand_to_reg(&ops[0])?;
     if is_spill(&dst) {
         let mut result = Vec::new();
+        result.push("push    r0".to_string());
         let actual = load_spill(&mut result, &dst, "r0");
         result.push(format!("ceq     {}, z", actual));
+        result.push("pop     r0".to_string());
         Ok(result)
     } else {
         Ok(vec![format!("ceq     {}, z", dst)])
@@ -835,16 +879,66 @@ fn translate_ret() -> Vec<String> {
     ]
 }
 
+/// Check if the instruction at `call_idx` is immediately followed by `ret`
+/// (skipping comments). Labels or other instructions break the pattern.
+fn is_followed_by_ret(lines: &[MspLine], call_idx: usize) -> bool {
+    for j in (call_idx + 1)..lines.len() {
+        match &lines[j] {
+            MspLine::Comment(_) => continue,
+            MspLine::Instruction(inst) if inst.mnemonic == "ret" => return true,
+            _ => return false,
+        }
+    }
+    false
+}
+
+/// Find the index of the `ret` following a call. Assumes `is_followed_by_ret` was true.
+fn skip_to_ret(lines: &[MspLine], call_idx: usize) -> usize {
+    for j in (call_idx + 1)..lines.len() {
+        if let MspLine::Instruction(inst) = &lines[j] {
+            if inst.mnemonic == "ret" {
+                return j;
+            }
+        }
+    }
+    call_idx
+}
+
+/// Translate a tail call: `call #target` where next instruction is `ret`.
+/// Instead of push return addr / call / pop / ret, just jump to target.
+/// The callee returns directly to our caller (whose address is already on stack).
+fn translate_tail_call(inst: &MspInst) -> Result<Vec<String>> {
+    let mut result = Vec::new();
+    match &inst.operands[0] {
+        MspOperand::Symbol(target) => {
+            result.push(format!("; tail call {}", target));
+            result.push(format!("la      r2, {}", target));
+            result.push("jmp     (r2)".to_string());
+        }
+        MspOperand::Register(r) => {
+            let src = map_register(*r)?;
+            result.push("; tail call (indirect)".to_string());
+            if src != "r2" {
+                result.push(format!("mov     r2, {}", src));
+            }
+            result.push("jmp     (r2)".to_string());
+        }
+        _ => bail!("unsupported tail call operand"),
+    }
+    Ok(result)
+}
+
 /// Translate PUSH
 fn translate_push(ops: &[MspOperand]) -> Result<Vec<String>> {
     match &ops[0] {
         MspOperand::Register(r) => {
             let reg = map_register(*r)?;
             if is_spill(&reg) {
-                // Spilled register: load from spill slot into r0, then push r0
+                // Spilled register: load from spill slot, then push.
+                // Use r1 as working register to avoid clobbering r0 (arg0/return value)
                 let mut result = Vec::new();
-                load_spill(&mut result, &reg, "r0");
-                result.push("push    r0".to_string());
+                load_spill(&mut result, &reg, "r1");
+                result.push("push    r1".to_string());
                 Ok(result)
             } else {
                 match reg.as_str() {
@@ -868,10 +962,11 @@ fn translate_pop(ops: &[MspOperand]) -> Result<Vec<String>> {
         MspOperand::Register(r) => {
             let reg = map_register(*r)?;
             if is_spill(&reg) {
-                // Spilled register: pop into r0, store to spill slot
+                // Spilled register: pop into r1, store to spill slot.
+                // Use r1 as working register to avoid clobbering r0 (return value)
                 let mut result = Vec::new();
-                result.push("pop     r0".to_string());
-                store_spill(&mut result, &reg, "r0");
+                result.push("pop     r1".to_string());
+                store_spill(&mut result, &reg, "r1");
                 Ok(result)
             } else {
                 match reg.as_str() {
@@ -1184,7 +1279,7 @@ add:
 	add	r13, r12
 	ret
 "#;
-        let result = translate_msp430(msp430, None).unwrap();
+        let result = translate_msp430(msp430, "add").unwrap();
         assert!(result.contains("add     r0, r1"));
         // ret = pop r2 + jmp (r2)
         assert!(result.contains("pop     r2"));
@@ -1200,7 +1295,7 @@ bitmask:
 	and	r13, r12
 	ret
 "#;
-        let result = translate_msp430(msp430, None).unwrap();
+        let result = translate_msp430(msp430, "bitmask").unwrap();
         assert!(result.contains("and     r0, r1"));
     }
 
@@ -1212,7 +1307,7 @@ test:
 	mov	#1000, r12
 	ret
 "#;
-        let result = translate_msp430(msp430, None).unwrap();
+        let result = translate_msp430(msp430, "start").unwrap();
         assert!(result.contains("la      r0, 0x0003E8"));
     }
 
@@ -1227,7 +1322,7 @@ compare_branch:
 .LBB4_2:
 	ret
 "#;
-        let result = translate_msp430(msp430, None).unwrap();
+        let result = translate_msp430(msp430, "start").unwrap();
         assert!(result.contains("clu     r0, r1"));
         assert!(result.contains("brt     .LBB4_2"));
     }
@@ -1250,7 +1345,7 @@ blink_loop:
 	call	#delay
 	jmp	.LBB2_1
 "#;
-        let result = translate_msp430(msp430, None).unwrap();
+        let result = translate_msp430(msp430, "start").unwrap();
         assert!(result.contains("bra     .LBB2_1"));
         // Should have stack-based calls (push return addr, jmp)
         assert!(result.contains("la      r2, mmio_write"));
@@ -1273,7 +1368,7 @@ button_echo:
 	call	#mmio_write
 	jmp	.LBB3_1
 "#;
-        let result = translate_msp430(msp430, None).unwrap();
+        let result = translate_msp430(msp430, "start").unwrap();
         // Should translate the AND #1 pattern
         assert!(result.contains("and"));
     }
@@ -1296,14 +1391,14 @@ demo_countdown:
 	tst	r10
 	jne	.LBB5_1
 "#;
-        let result = translate_msp430(msp430, None).unwrap();
-        // push r10: load spill_10 into r0, push r0
-        assert!(result.contains("lw      r0, 18(fp)"));
-        assert!(result.contains("push    r0"));
-        // mov #10, r10: load 10 into r0, store to spill slot
+        let result = translate_msp430(msp430, "start").unwrap();
+        // push r10: load spill_10 into r1 (avoids clobbering r0), push r1
+        assert!(result.contains("lw      r1, 18(fp)"));
+        assert!(result.contains("push    r1"));
+        // mov #10, r10: push/pop r0 to preserve it, load 10 into r0, store to spill slot
         assert!(result.contains("lc      r0, 10"));
         assert!(result.contains("sw      r0, 18(fp)"));
-        // tst r10: load from spill, ceq with z
+        // tst r10: push/pop r0 to preserve it, load from spill, ceq with z
         assert!(result.contains("ceq     r0, z"));
     }
 
@@ -1333,7 +1428,7 @@ fibonacci:
 	mov	r13, r12
 	ret
 "#;
-        let result = translate_msp430(msp430, None).unwrap();
+        let result = translate_msp430(msp430, "start").unwrap();
         // r15 -> spill_15 (offset 24), r11 -> spill_11 (offset 21)
         // mov r13, r11: store r1 to spill_11 slot
         assert!(result.contains("sw      r1, 21(fp)"));
@@ -1363,7 +1458,7 @@ delay:
 	add	#2, r1
 	ret
 "#;
-        let result = translate_msp430(msp430, None).unwrap();
+        let result = translate_msp430(msp430, "start").unwrap();
         // Should have scaled stack adjustment (2 MSP430 bytes → 3 COR24 bytes)
         assert!(result.contains("sub     sp, 3"));
         // Should have store to stack (via temp reg since COR24 can't use sp as base)
@@ -1411,31 +1506,39 @@ demo_blinky:
 mmio_write:
 	mov	r13, 0(r12)
 	ret
+
+	.section	.text.start,"ax",@progbits
+	.globl	start
+start:
+	call	#demo_blinky
 "#
     }
 
     #[test]
-    fn test_entry_point_explicit() {
-        // Positive: explicit --entry flag produces correct prologue
-        let result = translate_msp430(multi_function_msp430(), Some("demo_blinky")).unwrap();
+    fn test_start_convention_produces_prologue() {
+        // Positive: fixture has `start` label, default entry produces correct prologue
+        let result = translate_msp430(multi_function_msp430(), "start").unwrap();
         assert!(result.starts_with("; COR24 Assembly"));
-        assert!(result.contains("bra     demo_blinky"));
+        assert!(result.contains("mov     fp, sp"), "prologue must init fp");
+        assert!(result.contains("la      r0, start"));
+        assert!(result.contains("jmp     (r0)"));
         // Prologue must come before any function code
-        let bra_pos = result.find("bra     demo_blinky").unwrap();
+        let bra_pos = result.find("la      r0, start").unwrap();
         let first_func = result.find("_RNvCs_panic:").unwrap();
         assert!(bra_pos < first_func, "bra prologue must precede first function");
     }
 
     #[test]
-    fn test_entry_point_auto_detect_demo() {
-        // Positive: auto-detects demo_* as entry point
-        let result = translate_msp430(multi_function_msp430(), None).unwrap();
-        assert!(result.contains("bra     demo_blinky"));
+    fn test_explicit_entry_overrides_start() {
+        // Positive: explicit --entry flag overrides default "start"
+        let result = translate_msp430(multi_function_msp430(), "demo_blinky").unwrap();
+        assert!(result.contains("la      r0, demo_blinky"));
+        assert!(!result.contains("la      r0, start"));
     }
 
     #[test]
-    fn test_entry_point_auto_detect_main() {
-        // Positive: auto-detects main as entry point
+    fn test_missing_start_with_globl_fails() {
+        // Negative: .globl present but no `start` label → error
         let msp430 = r#"
 	.section	.text.helper,"ax",@progbits
 	.globl	helper
@@ -1448,97 +1551,145 @@ main:
 	call	#helper
 	ret
 "#;
-        let result = translate_msp430(msp430, None).unwrap();
-        assert!(result.contains("bra     main"));
+        let err = translate_msp430(msp430, "start").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("entry point 'start' not found"),
+            "Expected 'not found' error, got: {}", msg);
     }
 
     #[test]
-    fn test_entry_point_explicit_not_found_fails() {
+    fn test_nonexistent_entry_fails() {
         // Negative: explicit --entry with non-existent label fails
-        let err = translate_msp430(multi_function_msp430(), Some("nonexistent")).unwrap_err();
+        let err = translate_msp430(multi_function_msp430(), "nonexistent").unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("entry point 'nonexistent' not found"),
             "Expected 'not found' error, got: {}", msg);
-        assert!(msg.contains("demo_blinky"),
+        assert!(msg.contains("start"),
             "Error should list available labels, got: {}", msg);
     }
 
     #[test]
-    fn test_entry_point_explicit_typo_fails() {
+    fn test_entry_typo_fails() {
         // Negative: common typo in entry point name
-        let err = translate_msp430(multi_function_msp430(), Some("demo_blink")).unwrap_err();
-        assert!(err.to_string().contains("entry point 'demo_blink' not found"));
+        let err = translate_msp430(multi_function_msp430(), "strt").unwrap_err();
+        assert!(err.to_string().contains("entry point 'strt' not found"));
+    }
+
+    #[test]
+    fn test_spill_add_no_clobber() {
+        // add r12, r10: r12->r0 (src), r10->spill_10 (dst)
+        // Working register for spill load must NOT be r0 (would clobber live r12 value)
+        // Must push/pop working register to preserve other live GP values
+        let msp430 = r#"
+	.section	.text.test,"ax",@progbits
+test:
+	add	r12, r10
+	ret
+"#;
+        let result = translate_msp430(msp430, "start").unwrap();
+        // Should push r1 (working reg), load spill, operate, store, pop r1
+        assert!(result.contains("push    r1"), "should push working reg. Got:\n{}", result);
+        assert!(result.contains("lw      r1, 18(fp)"), "spill should load into r1. Got:\n{}", result);
+        assert!(result.contains("add     r1, r0"), "add should use r1 (spill) and r0 (r12). Got:\n{}", result);
+        assert!(result.contains("sw      r1, 18(fp)"), "result should be stored back. Got:\n{}", result);
+        assert!(result.contains("pop     r1"), "should pop working reg. Got:\n{}", result);
+    }
+
+    #[test]
+    fn test_spill_add_src_r13() {
+        // add r13, r10: r13->r1 (src), r10->spill_10 (dst)
+        // Working register should be r0 (since r1 is the source)
+        let msp430 = r#"
+	.section	.text.test,"ax",@progbits
+test:
+	add	r13, r10
+	ret
+"#;
+        let result = translate_msp430(msp430, "start").unwrap();
+        assert!(result.contains("push    r0"), "should push working reg. Got:\n{}", result);
+        assert!(result.contains("lw      r0, 18(fp)"), "spill should load into r0. Got:\n{}", result);
+        assert!(result.contains("add     r0, r1"), "add should use r0 (spill) and r1 (r13). Got:\n{}", result);
+    }
+
+    #[test]
+    fn test_tail_call_optimization() {
+        let msp430 = r#"
+	.section	.text.uart_putc,"ax",@progbits
+	.globl	uart_putc
+uart_putc:
+	mov	r12, r13
+	mov	#-255, r12
+	call	#mmio_write
+	ret
+"#;
+        let result = translate_msp430(msp430, "uart_putc").unwrap();
+        // Should be a tail call: la + jmp, no push/pop
+        assert!(result.contains("; tail call mmio_write"), "Should have tail call comment. Got:\n{}", result);
+        assert!(result.contains("la      r2, mmio_write"), "Should jump to target. Got:\n{}", result);
+        assert!(!result.contains("push    r2"), "tail call should not push return address. Got:\n{}", result);
+        // Should NOT have pop r2 / jmp (r2) for ret (it was consumed by tail call)
+        assert!(!result.contains("pop     r2"), "tail call should not have ret sequence. Got:\n{}", result);
+    }
+
+    #[test]
+    fn test_non_tail_call_preserved() {
+        // call followed by more instructions (not ret) should NOT be optimized
+        let msp430 = r#"
+	.section	.text.test,"ax",@progbits
+test:
+	call	#helper
+	mov	r12, r13
+	ret
+"#;
+        let result = translate_msp430(msp430, "start").unwrap();
+        // Should be a normal call with push/pop
+        assert!(result.contains("push    r2"), "non-tail call should push return addr. Got:\n{}", result);
+        assert!(result.contains(".Lret_"), "non-tail call should have return label. Got:\n{}", result);
     }
 
     #[test]
     fn test_no_globl_no_prologue() {
-        // No .globl directives = no auto-detection, no prologue (legacy single-function case)
+        // No .globl directives = no prologue (legacy single-function case)
         let msp430 = r#"
 	.section	.text.add,"ax",@progbits
 add:
 	add	r13, r12
 	ret
 "#;
-        let result = translate_msp430(msp430, None).unwrap();
+        let result = translate_msp430(msp430, "start").unwrap();
         assert!(!result.contains("Reset vector"), "Should not emit prologue without .globl");
-        // But the function itself should still be translated
         assert!(result.contains("add     r0, r1"));
-    }
-
-    #[test]
-    fn test_no_entry_detectable_with_globl_still_translates() {
-        // .globl directives exist but none match demo_*/main — warns but still works
-        let msp430 = r#"
-	.section	.text._RNvCs_panic,"ax",@progbits
-	.globl	_RNvCs_panic
-_RNvCs_panic:
-.LBB0_1:
-	jmp	.LBB0_1
-
-	.section	.text.mmio_write,"ax",@progbits
-	.globl	mmio_write
-mmio_write:
-	mov	r13, 0(r12)
-	ret
-"#;
-        // Should succeed (with warning to stderr) but no prologue
-        let result = translate_msp430(msp430, None).unwrap();
-        assert!(!result.contains("Reset vector"),
-            "Should not emit reset vector when no entry detected");
-        assert!(result.contains("mmio_write:"),
-            "Functions should still be translated");
     }
 
     #[test]
     fn test_prologue_assembles_correctly() {
         // End-to-end: translated COR24 with prologue should assemble without errors
-        let cor24 = translate_msp430(multi_function_msp430(), Some("demo_blinky")).unwrap();
+        let cor24 = translate_msp430(multi_function_msp430(), "start").unwrap();
 
         let mut assembler = cor24_emulator::assembler::Assembler::new();
         let result = assembler.assemble(&cor24);
         assert!(result.errors.is_empty(),
             "Assembly errors: {:?}", result.errors);
-        // Binary should have >4 bytes (prologue + functions)
         assert!(result.bytes.len() > 4, "Binary should be > 4 bytes");
     }
 
     #[test]
     fn test_prologue_jumps_to_correct_address() {
-        // End-to-end: load into CPU, execute prologue, verify PC lands at entry
-        let cor24 = translate_msp430(multi_function_msp430(), Some("demo_blinky")).unwrap();
+        // End-to-end: load into CPU, execute prologue, verify PC lands at start
+        let cor24 = translate_msp430(multi_function_msp430(), "start").unwrap();
 
         let mut assembler = cor24_emulator::assembler::Assembler::new();
         let result = assembler.assemble(&cor24);
         assert!(result.errors.is_empty(), "Assembly errors: {:?}", result.errors);
 
-        // Find the address of demo_blinky label
-        let blinky_addr = result.lines.iter()
-            .find(|l| l.source.trim() == "demo_blinky:")
+        // Find the address of start label
+        let start_addr = result.lines.iter()
+            .find(|l| l.source.trim() == "start:")
             .map(|l| l.address)
-            .expect("demo_blinky label should exist in assembled output");
-        assert!(blinky_addr > 0, "demo_blinky should not be at address 0");
+            .expect("start label should exist in assembled output");
+        assert!(start_addr > 0, "start should not be at address 0");
 
-        // Load and execute one instruction (the bra prologue)
+        // Load and execute three instructions (mov fp,sp + la r0, start + jmp (r0))
         let mut cpu = cor24_emulator::cpu::state::CpuState::new();
         for line in &result.lines {
             for (i, &b) in line.bytes.iter().enumerate() {
@@ -1547,41 +1698,12 @@ mmio_write:
         }
         cpu.pc = 0;
         let executor = cor24_emulator::cpu::executor::Executor::new();
-        executor.step(&mut cpu);
+        executor.step(&mut cpu); // mov fp, sp
+        executor.step(&mut cpu); // la r0, start
+        executor.step(&mut cpu); // jmp (r0)
 
-        assert_eq!(cpu.pc, blinky_addr,
-            "After executing prologue, PC should be at demo_blinky (0x{:06X}), got 0x{:06X}",
-            blinky_addr, cpu.pc);
-    }
-
-    #[test]
-    fn test_detect_entry_skips_mangled_names() {
-        // Only _RN... mangled names — should not be auto-detected
-        let lines = vec![
-            MspLine::Directive(".globl\t_RNvCs_something_mangled".to_string()),
-            MspLine::Label("_RNvCs_something_mangled".to_string()),
-        ];
-        assert_eq!(detect_entry_point(&lines), None);
-    }
-
-    #[test]
-    fn test_detect_entry_skips_helpers() {
-        // Only known helpers — should not be auto-detected
-        let lines = vec![
-            MspLine::Directive(".globl\tmmio_write".to_string()),
-            MspLine::Directive(".globl\tdelay".to_string()),
-            MspLine::Directive(".globl\tuart_putc".to_string()),
-        ];
-        assert_eq!(detect_entry_point(&lines), None);
-    }
-
-    #[test]
-    fn test_detect_entry_prefers_demo_over_other() {
-        // Both demo_foo and bar_func exist — should prefer demo_foo
-        let lines = vec![
-            MspLine::Directive(".globl\tbar_func".to_string()),
-            MspLine::Directive(".globl\tdemo_foo".to_string()),
-        ];
-        assert_eq!(detect_entry_point(&lines), Some("demo_foo".to_string()));
+        assert_eq!(cpu.pc, start_addr,
+            "After executing prologue, PC should be at start (0x{:06X}), got 0x{:06X}",
+            start_addr, cpu.pc);
     }
 }
