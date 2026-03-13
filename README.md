@@ -55,6 +55,19 @@ forms (1, 2, or 4 bytes).
 | Stack | `push`, `pop` |
 | Move | `mov`, `sxt`, `zxt` |
 
+## CLI Demos (Rust → COR24 Pipeline)
+
+12 self-contained Rust programs compile through the full
+Rust → MSP430 → COR24 → emulator pipeline. See **[docs/demos.md](docs/demos.md)**
+for the full catalog and usage.
+
+```bash
+cd rust-to-cor24/demos
+./run-demo.sh demo_add              # full pipeline for one demo
+./run-demo.sh demo_echo_v2 --uart-input 'hello\x21'
+./generate-all.sh                   # build and run all 12 demos
+```
+
 ## Building
 
 ### Prerequisites
