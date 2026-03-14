@@ -75,16 +75,16 @@ cd rust-to-cor24 && cargo build --release    # builds msp430-to-cor24 and cor24-
 | Demo | Description |
 |------|-------------|
 | **demo_add** | Computes `100 + 200 + 42 = 342`, stores result to memory. Note: `rustc` constant-folds the addition at compile time — the generated code just loads 342 directly. |
-| **demo_stack_vars** | Accumulates values across many variables, forcing register spills to fp-relative stack slots. Demonstrates the translator's spill mechanism. |
+| **demo_stack_vars** | Accumulates values across many variables, forcing register spills to fp-relative stack slots. XOR result stored to memory at 0x0100. Demonstrates the translator's spill mechanism. |
 
 ### Control Flow
 
 | Demo | Description |
 |------|-------------|
-| **demo_countdown** | Counts down from 10 to 0, writing each value to the LED register. Loop with delay. |
-| **demo_fibonacci** | Recursive `fib(10) = 55`. Deep stack frames, matches the reference C implementation. |
-| **demo_fibonacci_iter** | Iterative `fib(10) = 89` using a simple loop. Fits in 3 registers, no spills. |
-| **demo_nested** | Call chain: `start → demo_nested → level_a → level_b → level_c`. All intermediate stack frames are visible in the memory dump at halt. |
+| **demo_countdown** | Counts down from 10 to 0, storing each value to memory at 0x0100. Loop with delay. |
+| **demo_fibonacci** | Recursive `fib(10) = 89`. Deep stack frames, result stored to memory. |
+| **demo_fibonacci_iter** | Iterative `fib(10) = 89` using a simple loop. Fits in 3 registers, result stored to memory. |
+| **demo_nested** | Call chain: `start → demo_nested → level_a → level_b → level_c`. Result stored to memory at 0x0100. All intermediate stack frames are visible in the memory dump at halt. |
 
 ### UART I/O
 
@@ -135,6 +135,14 @@ All demos use byte-width MMIO (`sb`/`lb`) matching the hardware Verilog:
 | `0xFF0100` | `IO_UARTDATA` | UART data (read: RX byte, write: TX byte) |
 | `0xFF0101` | `IO_UARTSTATUS` | UART status (bit 0: RX ready) |
 | `0xFF0110` | `IO_UARTINTENA` | UART interrupt enable (bit 0: RX interrupt) |
+
+## Calling Convention Note
+
+The translator currently generates `push`/`jmp` sequences for function calls rather
+than using the COR24's `jal` (jump-and-link) instruction, which is the hardware's
+intended calling mechanism. A future update will switch to `jal` per the COR24
+architect's recommendation, saving ~4 bytes per call site. See
+[docs/research/20260314-cor24-plan.md](research/20260314-cor24-plan.md) for details.
 
 ## Source Files
 

@@ -150,6 +150,27 @@ the MSP430 assembly output. The translator finds `start` and emits the prologue.
 | r1 | sp | stack pointer |
 | r4-r11 | stack | spilled to fp-relative offsets |
 
+## Calling Convention
+
+The translator currently uses a **simplified calling convention** that differs from
+the standard COR24 C compiler convention designed by Luther Johnson (COR24 architect).
+
+| Aspect | Current Translator | Standard COR24 (Luther's) |
+|--------|-------------------|---------------------------|
+| **Function call** | `la r2, func; push r2; la r2, target; jmp (r2)` (4 insn, 10 bytes) | `la r0, func; jal r1,(r0)` (2 insn, 5 bytes) |
+| **Return** | `pop r2; jmp (r2)` | `jmp (r1)` |
+| **Arguments** | In registers (r0=arg0, r1=arg1, r2=arg2) | On the stack |
+| **Return value** | In r0 | In r0 |
+| **Prologue** | None (saves only what's needed) | `push fp; push r2; push r1; mov fp,sp` |
+| **Epilogue** | None | `pop r1; pop r2; pop fp; jmp (r1)` |
+
+The `jal` (jump-and-link) instruction is the COR24's dedicated call instruction. It
+saves the return address in r1 automatically, eliminating the need to compute and push
+a return label. The translator's current approach bypasses `jal` entirely.
+
+A phased plan to adopt `jal` and the standard calling convention is documented in
+[docs/research/20260314-cor24-plan.md](../docs/research/20260314-cor24-plan.md).
+
 ## I/O Address Mapping
 
 MSP430 uses 16-bit addresses. COR24 uses 24-bit. The translator maps:
