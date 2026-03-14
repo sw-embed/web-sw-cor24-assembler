@@ -148,7 +148,18 @@ impl Assembler {
 
         // Handle directives
         if instruction_part.starts_with('.') {
+            let before_len = self.output.len();
             self.handle_directive(instruction_part, line_num);
+            // Record directive bytes in lines so they appear in output
+            let directive_bytes = self.output[before_len..].to_vec();
+            if !directive_bytes.is_empty() || label.is_some() {
+                self.lines.push(AssembledLine {
+                    address: start_addr,
+                    bytes: directive_bytes,
+                    source: line.to_string(),
+                    label,
+                });
+            }
             return;
         }
 
