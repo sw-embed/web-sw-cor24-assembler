@@ -1513,6 +1513,10 @@ pub fn app() -> Html {
                     on_switch_toggle={on_c_switch_toggle}
                     on_uart_send={on_c_uart_send}
                     on_uart_clear={on_c_uart_clear}
+                    on_tutorial_open={
+                        let tutorial_open = tutorial_open.clone();
+                        Callback::from(move |_| tutorial_open.set(true))
+                    }
                     on_examples_open={
                         let c_examples_open = c_examples_open.clone();
                         Callback::from(move |_| c_examples_open.set(true))

@@ -96,6 +96,8 @@ pub struct CPipelineProps {
     #[prop_or_default]
     pub on_uart_clear: Callback<()>,
     #[prop_or_default]
+    pub on_tutorial_open: Callback<()>,
+    #[prop_or_default]
     pub on_examples_open: Callback<()>,
     #[prop_or_default]
     pub on_isa_ref_open: Callback<()>,
@@ -179,6 +181,10 @@ pub fn c_pipeline(props: &CPipelineProps) -> Html {
             // Column 1: Sidebar
             <div class="wizard-sidebar">
                 <div class="wizard-buttons">
+                    <button data-tooltip="Step-by-step guide to the C pipeline" onclick={
+                        let cb = props.on_tutorial_open.clone();
+                        Callback::from(move |_| cb.emit(()))
+                    }>{"Tutorial"}</button>
                     <button data-tooltip="Load a pre-built C example" onclick={
                         let cb = props.on_examples_open.clone();
                         Callback::from(move |_| cb.emit(()))
