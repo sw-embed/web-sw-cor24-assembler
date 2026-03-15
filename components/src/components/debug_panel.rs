@@ -7,19 +7,30 @@ use yew::prelude::*;
 
 use crate::EmulatorState;
 
-/// Format UART output as hex dump with ASCII sidebar (like od/hexdump)
-/// Shows: "48 65 6C 6C 6F 0A  Hello."
+/// Format UART output as hex dump with ASCII sidebar (like od/hexdump).
+/// 16 bytes per line: "48 65 6C 6C 6F 20 57 6F 72 6C 64 21 0A 00 00 00  Hello World!...."
 fn format_uart_output(s: &str) -> String {
     if s.is_empty() {
         return String::new();
     }
     let bytes: Vec<u8> = s.bytes().collect();
-    let hex: Vec<String> = bytes.iter().map(|b| format!("{:02X}", b)).collect();
-    let ascii: String = bytes
-        .iter()
-        .map(|&b| if (0x20..0x7F).contains(&b) { b as char } else { '.' })
-        .collect();
-    format!("{}  {}", hex.join(" "), ascii)
+    let mut lines = Vec::new();
+    for chunk in bytes.chunks(16) {
+        let hex: Vec<String> = chunk.iter().map(|b| format!("{:02X}", b)).collect();
+        // Pad hex to 16 columns so ASCII column aligns
+        let hex_str = if chunk.len() < 16 {
+            let padding = "   ".repeat(16 - chunk.len());
+            format!("{}{}", hex.join(" "), padding)
+        } else {
+            hex.join(" ")
+        };
+        let ascii: String = chunk
+            .iter()
+            .map(|&b| if (0x20..0x7F).contains(&b) { b as char } else { '.' })
+            .collect();
+        lines.push(format!("{}  {}", hex_str, ascii));
+    }
+    lines.join("\n")
 }
 
 #[derive(Properties, PartialEq)]

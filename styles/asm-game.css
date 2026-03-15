@@ -1703,6 +1703,7 @@ header h1 {
     background: #12101f;
     border: 1px solid #3d2e6b;
     font-size: 1.1em;
+    max-height: none;
 }
 
 .rust-wizard-layout .rust-code {
@@ -1901,7 +1902,7 @@ header h1 {
 
 .uart-panel-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 4px;
 }
 
