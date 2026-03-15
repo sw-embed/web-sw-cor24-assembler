@@ -1652,6 +1652,10 @@ header h1 {
     border-radius: 5px;
     margin-bottom: 12px;
     border: 1px solid #3d2e6b;
+}
+
+/* Debug cell needs visible overflow for native <select> dropdowns */
+.notebook-cell:not(.notebook-cell-debug) {
     overflow: hidden;
 }
 

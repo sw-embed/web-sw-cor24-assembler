@@ -175,13 +175,16 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
     // Wizard step state
     let current_step = use_state(|| WizardStep::Source);
 
-    // Auto-load "Blink LED" on first render
+    // Auto-load "Blink LED" on first render (skip if already loaded, e.g. tab switch)
     {
         let on_load = props.on_load.clone();
         let examples = props.examples.clone();
+        let already_loaded = props.loaded_example.is_some();
         use_effect_with((), move |_| {
-            if let Some(blink) = examples.iter().find(|e| e.name == "Blink LED") {
-                on_load.emit(blink.clone());
+            if !already_loaded {
+                if let Some(blink) = examples.iter().find(|e| e.name == "Blink LED") {
+                    on_load.emit(blink.clone());
+                }
             }
             || ()
         });

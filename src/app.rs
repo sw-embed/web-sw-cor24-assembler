@@ -429,6 +429,7 @@ pub fn app() -> Html {
 
         Callback::from(move |example: RustExample| {
             rust_load_gen.set(*rust_load_gen + 1);
+            rust_loaded_example.set(Some(example.clone()));
             let mut new_cpu = WasmCpu::new();
             // Assemble the COR24 assembly from the example
             if new_cpu.assemble(&example.cor24_assembly).is_ok() {
@@ -483,7 +484,6 @@ pub fn app() -> Html {
 
                 rust_cpu.set(new_cpu);
                 rust_is_loaded.set(true);
-                rust_loaded_example.set(Some(example));
             }
         })
     };
@@ -957,6 +957,7 @@ pub fn app() -> Html {
 
         Callback::from(move |example: CExample| {
             c_load_gen.set(*c_load_gen + 1);
+            c_loaded_example.set(Some(example.clone()));
             let mut new_cpu = WasmCpu::new();
             if new_cpu.assemble(&example.cor24_assembly).is_ok() {
                 let assembled_lines = new_cpu.get_assembled_lines();
@@ -1008,7 +1009,6 @@ pub fn app() -> Html {
 
                 c_cpu.set(new_cpu);
                 c_is_loaded.set(true);
-                c_loaded_example.set(Some(example));
             }
         })
     };

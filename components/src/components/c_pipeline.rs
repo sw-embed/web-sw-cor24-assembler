@@ -109,13 +109,16 @@ pub struct CPipelineProps {
 pub fn c_pipeline(props: &CPipelineProps) -> Html {
     let current_step = use_state(|| CWizardStep::Source);
 
-    // Auto-load first example on first render
+    // Auto-load first example on first render (skip if already loaded, e.g. tab switch)
     {
         let on_load = props.on_load.clone();
         let examples = props.examples.clone();
+        let already_loaded = props.loaded_example.is_some();
         use_effect_with((), move |_| {
-            if let Some(first) = examples.first() {
-                on_load.emit(first.clone());
+            if !already_loaded {
+                if let Some(first) = examples.first() {
+                    on_load.emit(first.clone());
+                }
             }
             || ()
         });
