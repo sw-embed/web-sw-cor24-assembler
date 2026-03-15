@@ -25,6 +25,8 @@ pub fn app() -> Html {
     let rust_is_running = use_state(|| false);
     let rust_loaded_example = use_state(|| None::<RustExample>);
     let rust_load_gen = use_state(|| 0u32);
+    // Rc<Cell> counter avoids stale closure reads of use_state in callbacks
+    let rust_load_counter = use_mut_ref(|| Rc::new(Cell::new(0u32)));
     let rust_switch_value = use_state(|| 0u8);
     // Use Rc<Cell> for immediate stop flag visibility in Rust pipeline
     let rust_stop_requested = use_mut_ref(|| Rc::new(Cell::new(false)));
@@ -42,6 +44,7 @@ pub fn app() -> Html {
     let c_is_running = use_state(|| false);
     let c_loaded_example = use_state(|| None::<CExample>);
     let c_load_gen = use_state(|| 0u32);
+    let c_load_counter = use_mut_ref(|| Rc::new(Cell::new(0u32)));
     let c_switch_value = use_state(|| 0u8);
     let c_stop_requested = use_mut_ref(|| Rc::new(Cell::new(false)));
     let c_shared_switches = use_mut_ref(|| Rc::new(Cell::new(0u8)));
@@ -61,6 +64,8 @@ pub fn app() -> Html {
 
     // Track whether assembly succeeded (enables Step/Run)
     let asm_assembled = use_state(|| false);
+    let asm_load_gen = use_state(|| 0u32);
+    let asm_load_counter = use_mut_ref(|| Rc::new(Cell::new(0u32)));
 
     // Animated run state for assembler tab
     let asm_is_running = use_state(|| false);
@@ -426,9 +431,12 @@ pub fn app() -> Html {
         let rust_is_loaded = rust_is_loaded.clone();
         let rust_loaded_example = rust_loaded_example.clone();
         let rust_load_gen = rust_load_gen.clone();
+        let rust_load_counter = rust_load_counter.borrow().clone();
 
         Callback::from(move |example: RustExample| {
-            rust_load_gen.set(*rust_load_gen + 1);
+            let new_gen = rust_load_counter.get() + 1;
+            rust_load_counter.set(new_gen);
+            rust_load_gen.set(new_gen);
             rust_loaded_example.set(Some(example.clone()));
             let mut new_cpu = WasmCpu::new();
             // Assemble the COR24 assembly from the example
@@ -859,8 +867,8 @@ pub fn app() -> Html {
     // Tab definitions
     let tabs = vec![
         Tab { id: "assembler".to_string(), label: "Assembler".to_string(), tooltip: Some("Write and run COR24 assembly directly".to_string()) },
-        Tab { id: "rust".to_string(), label: "Rust".to_string(), tooltip: Some("Rust → MSP430 → COR24 compilation pipeline".to_string()) },
         Tab { id: "c".to_string(), label: "C".to_string(), tooltip: Some("C → COR24 compilation pipeline (Luther Johnson's cc24)".to_string()) },
+        Tab { id: "rust".to_string(), label: "Rust".to_string(), tooltip: Some("Rust → MSP430 → COR24 compilation pipeline".to_string()) },
     ];
 
     // Get examples for the modal
@@ -954,9 +962,12 @@ pub fn app() -> Html {
         let c_is_loaded = c_is_loaded.clone();
         let c_loaded_example = c_loaded_example.clone();
         let c_load_gen = c_load_gen.clone();
+        let c_load_counter = c_load_counter.borrow().clone();
 
         Callback::from(move |example: CExample| {
-            c_load_gen.set(*c_load_gen + 1);
+            let new_gen = c_load_counter.get() + 1;
+            c_load_counter.set(new_gen);
+            c_load_gen.set(new_gen);
             c_loaded_example.set(Some(example.clone()));
             let mut new_cpu = WasmCpu::new();
             if new_cpu.assemble(&example.cor24_assembly).is_ok() {
@@ -1434,6 +1445,7 @@ pub fn app() -> Html {
                         }
                     }
                     initial_code={Some((*program_code).clone())}
+                    load_generation={*asm_load_gen}
                     step_enabled={*asm_assembled && !(*cpu).is_halted()}
                     run_enabled={*asm_assembled && !(*cpu).is_halted()}
                     show_exec_buttons={false}
@@ -1645,6 +1657,8 @@ pub fn app() -> Html {
                     let asm_assembled = asm_assembled.clone();
                     let asm_emu_state = asm_emu_state.clone();
                     let stop_flag = asm_stop_requested.borrow().clone();
+                    let asm_load_gen = asm_load_gen.clone();
+                    let asm_load_counter = asm_load_counter.borrow().clone();
                     Callback::from(move |idx: usize| {
                         if let Some((_, _, code)) = examples.get(idx) {
                             // Stop any running animation loop
@@ -1658,6 +1672,9 @@ pub fn app() -> Html {
                             challenge_mode.set(false);
                             current_challenge_id.set(None);
                             challenge_result.set(None);
+                            let new_gen = asm_load_counter.get() + 1;
+                            asm_load_counter.set(new_gen);
+                            asm_load_gen.set(new_gen);
                             program_code.set(code.clone());
                             examples_open.set(false);
                         }
@@ -1711,6 +1728,7 @@ pub fn app() -> Html {
                     asm_emu_state.clone(), cpu.clone(),
                     assembly_output.clone(), assembly_lines.clone(),
                     asm_stop_requested.borrow().clone(), challenge_result.clone(),
+                    asm_load_gen.clone(), asm_load_counter.borrow().clone(),
                 )}
             </Modal>
 
@@ -1762,6 +1780,8 @@ fn render_challenges_list(
     assembly_lines: UseStateHandle<Vec<String>>,
     stop_flag: Rc<Cell<bool>>,
     challenge_result: UseStateHandle<Option<Result<String, String>>>,
+    asm_load_gen: UseStateHandle<u32>,
+    asm_load_counter: Rc<Cell<u32>>,
 ) -> Html {
     let challenges = get_challenges();
 
@@ -1806,6 +1826,8 @@ fn render_challenges_list(
                                 let assembly_lines = assembly_lines.clone();
                                 let stop_flag = stop_flag.clone();
                                 let challenge_result = challenge_result.clone();
+                                let asm_load_gen = asm_load_gen.clone();
+                                let asm_load_counter = asm_load_counter.clone();
                                 Callback::from(move |_| {
                                     // Stop any running animation loop
                                     stop_flag.set(true);
@@ -1818,6 +1840,9 @@ fn render_challenges_list(
                                     challenge_result.set(None);
                                     challenge_mode.set(true);
                                     current_challenge_id.set(Some(id));
+                                    let new_gen = asm_load_counter.get() + 1;
+                                    asm_load_counter.set(new_gen);
+                                    asm_load_gen.set(new_gen);
                                     program_code.set(initial_code.clone());
                                     challenges_open.set(false);
                                 })

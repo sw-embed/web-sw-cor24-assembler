@@ -10,6 +10,9 @@ pub struct ProgramAreaProps {
     pub on_reset: Callback<()>,
     pub assembly_output: Option<Html>,
     pub initial_code: Option<String>,
+    /// Generation counter — forces code re-apply even when initial_code is unchanged
+    #[prop_or_default]
+    pub load_generation: u32,
     pub step_enabled: bool,
     pub run_enabled: bool,
     #[prop_or(false)]
@@ -24,11 +27,12 @@ pub fn program_area(props: &ProgramAreaProps) -> Html {
     let editor_ref = use_node_ref();
     let code = use_state(|| props.initial_code.clone().unwrap_or_default());
 
-    // Update code when initial_code prop changes
+    // Update code when initial_code prop changes or a new example is loaded
     {
         let code = code.clone();
         let initial_code = props.initial_code.clone();
-        use_effect_with(initial_code.clone(), move |_| {
+        let load_gen = props.load_generation;
+        use_effect_with((initial_code.clone(), load_gen), move |_| {
             if let Some(new_code) = initial_code {
                 code.set(new_code);
             }
