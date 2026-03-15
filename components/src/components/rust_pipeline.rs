@@ -181,11 +181,10 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
         let examples = props.examples.clone();
         let already_loaded = props.loaded_example.is_some();
         use_effect_with((), move |_| {
-            if !already_loaded {
-                if let Some(blink) = examples.iter().find(|e| e.name == "Blink LED") {
+            if !already_loaded
+                && let Some(blink) = examples.iter().find(|e| e.name == "Blink LED") {
                     on_load.emit(blink.clone());
                 }
-            }
             || ()
         });
     }

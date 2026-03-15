@@ -3,8 +3,8 @@
 //! Parses the monitor "load and go" format produced by `as24 | longlgo`.
 //!
 //! Format:
-//!   L<AAAAAA><HH><HH>...   Load hex bytes at 24-bit address
-//!   G<AAAAAA>               Go — set PC to address (optional)
+//!   `L<AAAAAA><HH><HH>...`   Load hex bytes at 24-bit address
+//!   `G<AAAAAA>`               Go — set PC to address (optional)
 //!
 //! The address is 6 hex digits. Data bytes follow as pairs of hex digits.
 

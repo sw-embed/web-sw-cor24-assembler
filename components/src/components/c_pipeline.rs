@@ -115,11 +115,10 @@ pub fn c_pipeline(props: &CPipelineProps) -> Html {
         let examples = props.examples.clone();
         let already_loaded = props.loaded_example.is_some();
         use_effect_with((), move |_| {
-            if !already_loaded {
-                if let Some(first) = examples.first() {
+            if !already_loaded
+                && let Some(first) = examples.first() {
                     on_load.emit(first.clone());
                 }
-            }
             || ()
         });
     }

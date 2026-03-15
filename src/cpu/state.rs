@@ -115,7 +115,7 @@ pub struct TraceEntry {
     pub c_before: bool,
     /// Condition flag after
     pub c_after: bool,
-    /// SP before (convenience, same as regs_before[4])
+    /// SP before (convenience, same as regs_before\[4\])
     pub sp_before: u32,
     /// Instruction count at this point
     pub instruction_num: u64,
@@ -133,10 +133,10 @@ impl fmt::Display for TraceEntry {
 
         // Show register changes
         let mut changes = Vec::new();
-        for i in 0..8 {
+        for (i, name) in REG_NAMES.iter().enumerate() {
             if self.regs_before[i] != self.regs_after[i] {
                 changes.push(format!("{}:0x{:06X}→0x{:06X}",
-                    REG_NAMES[i], self.regs_before[i], self.regs_after[i]));
+                    name, self.regs_before[i], self.regs_after[i]));
             }
         }
         if self.c_before != self.c_after {
