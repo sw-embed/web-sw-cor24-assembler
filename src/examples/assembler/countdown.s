@@ -1,15 +1,17 @@
-; Countdown: Store 10 down to 0 to memory at 0x0100
+; Countdown: Store 10 down to 0 to memory at 256
 ; Writes count to memory, delays, decrements
 
-        la      r1,0x000100 ; Result address
+        la      r1,256      ; Result address
         lc      r0,10       ; Start at 10
 
-loop:   sb      r0,0(r1)    ; Write count to memory
+loop:
+        sb      r0,0(r1)    ; Write count to memory
 
         ; Delay loop
         push    r0
         lc      r2,0
-wait:   add     r2,1
+wait:
+        add     r2,1
         lc      r0,127
         clu     r2,r0
         brt     wait
@@ -23,4 +25,5 @@ wait:   add     r2,1
         ; Clear result and halt
         lc      r0,0
         sb      r0,0(r1)
-halt:   bra     halt
+halt:
+        bra     halt

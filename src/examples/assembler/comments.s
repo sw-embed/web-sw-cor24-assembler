@@ -13,15 +13,12 @@
 
     lcu r0, 100     ; load 100 into r0
 
-; Hash marks work too:
-
-    lcu r1, 200     # load 200 into r1
-
-# Full-line comments use ; or #
+    lcu r1, 200     ; load 200 into r1
 
 ; -- Try it: edit, assemble, step! --
 
     add r0, r1      ; r0 = 300
 
 ; Stop by branching to self:
-done:   bra     done    ; causes emulator halt
+done:
+        bra     done    ; causes emulator halt

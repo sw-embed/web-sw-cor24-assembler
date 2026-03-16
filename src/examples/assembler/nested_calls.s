@@ -8,7 +8,8 @@
         la      r2,level_a
         jal     r1,(r2)         ; call level_a(5)
 ret_a:
-halt:   bra     halt            ; r0 = 33
+halt:
+        bra     halt            ; r0 = 33
 
         ; --- level_a(x): returns level_b(x + 10) ---
 level_a:
@@ -19,7 +20,8 @@ level_a:
         la      r1,ret_b
         la      r2,level_b
         jal     r1,(r2)         ; call level_b(15)
-ret_b:  mov     sp,fp
+ret_b:
+        mov     sp,fp
         pop     r1              ; restore return addr
         pop     fp
         jmp     (r1)            ; return

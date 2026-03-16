@@ -5,7 +5,7 @@
 ; S2 is active-low (normally 1, pressed = 0)
 ; We invert with XOR so LED on = button pressed
 
-        la      r1,0xFF0000 ; I/O address (LEDSWDAT)
+        la      r1,-65536   ; I/O address (LEDSWDAT)
         lc      r2,1        ; Bit mask for XOR
 
 loop:
@@ -15,4 +15,5 @@ loop:
 
         bra     loop        ; Keep polling
 
-halt:   bra     halt        ; Never reached
+halt:
+        bra     halt        ; Never reached

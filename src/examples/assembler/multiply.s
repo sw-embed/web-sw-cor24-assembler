@@ -1,9 +1,10 @@
-; Multiply: 6 × 7 = 42 via repeated addition
+; Multiply: 6 x 7 = 42 via repeated addition
 ; Prints "42\n" to UART
 
         lc      r0,0            ; sum = 0
         lc      r1,7            ; counter = 7
-loop:   add     r0,6            ; sum += 6
+loop:
+        add     r0,6            ; sum += 6
         push    r0              ; save sum
         lc      r0,1
         sub     r1,r0           ; counter--
@@ -13,7 +14,8 @@ loop:   add     r0,6            ; sum += 6
 
         ; r0 = 42, divide by 10 (repeated subtraction)
         lc      r1,0            ; tens = 0
-div10:  lc      r2,10
+div10:
+        lc      r2,10
         clu     r0,r2           ; r0 < 10?
         brt     done            ; yes: r0=ones, r1=tens
         sub     r0,r2           ; r0 -= 10
@@ -39,14 +41,17 @@ done:
         la      r2,putc
         jal     r1,(r2)         ; call putc
 
-halt:   bra     halt
+halt:
+        bra     halt
 
 ; putc: send byte in r0, polling TX busy first
 ; Uses jal calling convention: r1 = return address
-putc:   push    r1              ; save return address
+putc:
+        push    r1              ; save return address
         push    r0              ; save char
-        la      r1,0xFF0100     ; UART base
-.wait:  lb      r2,1(r1)        ; read status byte
+        la      r1,-65280       ; UART base
+.wait:
+        lb      r2,1(r1)        ; read status byte
         lcu     r0,128
         and     r2,r0           ; isolate bit 7
         ceq     r2,z

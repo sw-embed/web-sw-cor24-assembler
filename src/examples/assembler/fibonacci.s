@@ -5,7 +5,8 @@
         lc      r1,1            ; b = 1
         lc      r2,10           ; 10 iterations
 
-loop:   push    r0              ; save a
+loop:
+        push    r0              ; save a
         push    r2              ; save counter
         ; print b (current fib number)
         mov     r0,r1           ; r0 = b (value to print)
@@ -47,7 +48,8 @@ skip_sp:
         la      r2,putc
         jal     r1,(r2)         ; call putc
 
-halt:   bra     halt
+halt:
+        bra     halt
 
 ; print_num: print r0 as 1-2 digit decimal
 ; Uses jal calling convention: r1 = return address
@@ -55,13 +57,15 @@ halt:   bra     halt
 print_num:
         push    r1              ; save return address
         lc      r1,0            ; tens = 0
-.div:   lc      r2,10
+.div:
+        lc      r2,10
         clu     r0,r2           ; r0 < 10?
         brt     .ones           ; yes, r0 = ones digit
         sub     r0,r2           ; r0 -= 10
         add     r1,1            ; tens++
         bra     .div
-.ones:  push    r0              ; save ones
+.ones:
+        push    r0              ; save ones
         ; print tens if nonzero
         ceq     r1,z
         brt     .notens
@@ -82,10 +86,12 @@ print_num:
 
 ; putc: send byte in r0, polling TX busy first
 ; Uses jal calling convention: r1 = return address
-putc:   push    r1              ; save return address
+putc:
+        push    r1              ; save return address
         push    r0              ; save char
-        la      r1,0xFF0100     ; UART base
-.wait:  lb      r2,1(r1)        ; read status byte
+        la      r1,-65280       ; UART base
+.wait:
+        lb      r2,1(r1)        ; read status byte
         lcu     r0,128
         and     r2,r0           ; isolate bit 7
         ceq     r2,z
