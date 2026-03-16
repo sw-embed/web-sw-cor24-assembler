@@ -151,11 +151,9 @@ pub fn c_pipeline(props: &CPipelineProps) -> Html {
                 gloo::timers::callback::Timeout::new(100, move || {
                     if let Some(window) = web_sys::window()
                         && let Some(document) = window.document()
-                        && let Some(container) = document.get_element_by_id("c-notebook-scroll")
                         && let Some(element) = document.get_element_by_id(&scroll_to_cell)
                     {
-                        let element_html: &web_sys::HtmlElement = element.unchecked_ref();
-                        container.set_scroll_top(element_html.offset_top());
+                        element.scroll_into_view();
                     }
                 }).forget();
             }
@@ -172,11 +170,9 @@ pub fn c_pipeline(props: &CPipelineProps) -> Html {
                     let cell_id = step.cell_id().to_string();
                     if let Some(window) = web_sys::window()
                         && let Some(document) = window.document()
-                        && let Some(container) = document.get_element_by_id("c-notebook-scroll")
                         && let Some(element) = document.get_element_by_id(&cell_id)
                     {
-                        let element_html: &web_sys::HtmlElement = element.unchecked_ref();
-                        container.set_scroll_top(element_html.offset_top());
+                        element.scroll_into_view();
                     }
                 }
             })
