@@ -575,6 +575,71 @@ button.stop-btn:hover {
     overflow-y: auto;
 }
 
+.modal-body h4 {
+    color: #00d9ff;
+    margin-top: 20px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #2a3a5e;
+}
+
+.modal-body h4:first-child {
+    margin-top: 8px;
+}
+
+.modal-body pre {
+    background: #0d1b2a;
+    border: 1px solid #2a3a5e;
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin: 8px 0 12px 0;
+    font-size: 0.9em;
+    overflow-x: auto;
+}
+
+.modal-body table {
+    border-collapse: collapse;
+    margin: 8px 0 12px 0;
+    width: 100%;
+}
+
+.modal-body td, .modal-body th {
+    padding: 5px 10px;
+    border: 1px solid #2a3a5e;
+    text-align: left;
+}
+
+.modal-body th {
+    background: #1a2a4e;
+    color: #00d9ff;
+}
+
+.modal-body tr:nth-child(even) {
+    background: #0d1b2a;
+}
+
+.modal-body code {
+    background: #0d1b2a;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.95em;
+}
+
+.modal-body p {
+    margin: 6px 0;
+    line-height: 1.5;
+}
+
+.modal-body ul, .modal-body ol {
+    margin: 6px 0 12px 0;
+    padding-left: 24px;
+}
+
+.modal-body li {
+    margin: 4px 0;
+    line-height: 1.5;
+}
+
 .modal-close {
     color: #00d9ff;
     float: right;

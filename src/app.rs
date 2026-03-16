@@ -2052,79 +2052,143 @@ nop             ; no operation (encoded as add r0,r0)</pre>
 
 const ISA_REF_CONTENT: &str = r#"
 <h3>COR24 Instruction Set Reference</h3>
-<p><em>32 operations &times; register fields = 211 instruction forms.
+<p><em>32 opcodes, 211 instruction forms (1, 2, or 4 bytes).
 See <a href="https://makerlisp.com" target="_blank">makerlisp.com</a> for the hardware specification.</em></p>
 
-<h4>Load Instructions</h4>
-<p><strong>lc ra,dd</strong> - Load Constant (signed 8-bit)</p>
-<p>Example: <code>lc r0,42</code> loads 42 into r0</p>
+<h4>Registers</h4>
+<table>
+<tr><th>Register</th><th>Name</th><th>Purpose</th></tr>
+<tr><td><code>r0</code></td><td></td><td>General purpose</td></tr>
+<tr><td><code>r1</code></td><td></td><td>General purpose / return address (jal)</td></tr>
+<tr><td><code>r2</code></td><td></td><td>General purpose</td></tr>
+<tr><td><code>r3</code></td><td>fp</td><td>Frame pointer</td></tr>
+<tr><td><code>r4</code></td><td>sp</td><td>Stack pointer (init: 0xFEEC00, grows down)</td></tr>
+<tr><td><code>r5</code></td><td>z</td><td>Always zero — for compares: <code>ceq r0, z</code></td></tr>
+<tr><td><code>r6</code></td><td>iv</td><td>Interrupt vector (ISR address)</td></tr>
+<tr><td><code>r7</code></td><td>ir</td><td>Interrupt return address</td></tr>
+</table>
+<p>Single condition flag <strong>C</strong> — set by compare instructions, tested by branches.</p>
 
-<p><strong>lcu ra,dd</strong> - Load Constant Unsigned</p>
-<p>Example: <code>lcu r0,255</code> loads 255 into r0</p>
+<h4>Load Constants</h4>
+<table>
+<tr><th>Instruction</th><th>Bytes</th><th>Description</th></tr>
+<tr><td><code>lc ra, dd</code></td><td>2</td><td>Load signed 8-bit constant (-128..127). Sign-extends to 24 bits.</td></tr>
+<tr><td><code>lcu ra, dd</code></td><td>2</td><td>Load unsigned 8-bit constant (0..255). Zero-extends to 24 bits.</td></tr>
+<tr><td><code>la ra, addr</code></td><td>4</td><td>Load 24-bit address/constant. Any value 0..16777215.</td></tr>
+</table>
 
-<p><strong>la ra,addr</strong> - Load 24-bit Address</p>
-<p>Example: <code>la r0,0x1000</code> loads address into r0</p>
+<h4>Arithmetic</h4>
+<table>
+<tr><th>Instruction</th><th>Bytes</th><th>Description</th></tr>
+<tr><td><code>add ra, rb</code></td><td>1</td><td>ra = ra + rb</td></tr>
+<tr><td><code>add ra, dd</code></td><td>2</td><td>ra = ra + dd (signed 8-bit immediate)</td></tr>
+<tr><td><code>sub ra, rb</code></td><td>1</td><td>ra = ra - rb</td></tr>
+<tr><td><code>sub sp, addr</code></td><td>4</td><td>sp = sp - addr (24-bit; allocate stack space)</td></tr>
+<tr><td><code>mul ra, rb</code></td><td>1</td><td>ra = ra * rb (24-bit result, overflow wraps)</td></tr>
+</table>
 
-<h4>Arithmetic Instructions</h4>
-<p><strong>add ra,rb</strong> - Add registers: ra = ra + rb</p>
-<p><strong>add ra,dd</strong> - Add immediate: ra = ra + dd</p>
-<p><strong>sub ra,rb</strong> - Subtract: ra = ra - rb</p>
-<p><strong>mul ra,rb</strong> - Multiply: ra = ra * rb</p>
+<h4>Logic &amp; Shifts</h4>
+<table>
+<tr><th>Instruction</th><th>Bytes</th><th>Description</th></tr>
+<tr><td><code>and ra, rb</code></td><td>1</td><td>ra = ra AND rb</td></tr>
+<tr><td><code>or ra, rb</code></td><td>1</td><td>ra = ra OR rb</td></tr>
+<tr><td><code>xor ra, rb</code></td><td>1</td><td>ra = ra XOR rb</td></tr>
+<tr><td><code>shl ra, rb</code></td><td>1</td><td>ra = ra &lt;&lt; rb (shift left)</td></tr>
+<tr><td><code>srl ra, rb</code></td><td>1</td><td>ra = ra &gt;&gt; rb (shift right, zero fill)</td></tr>
+<tr><td><code>sra ra, rb</code></td><td>1</td><td>ra = ra &gt;&gt; rb (shift right, sign fill)</td></tr>
+</table>
 
-<h4>Logic Instructions</h4>
-<p><strong>and ra,rb</strong> - Bitwise AND</p>
-<p><strong>or ra,rb</strong> - Bitwise OR</p>
-<p><strong>xor ra,rb</strong> - Bitwise XOR</p>
-<p><strong>shl ra,rb</strong> - Shift left</p>
-<p><strong>srl ra,rb</strong> - Shift right logical</p>
-<p><strong>sra ra,rb</strong> - Shift right arithmetic</p>
+<h4>Compare (set C flag)</h4>
+<table>
+<tr><th>Instruction</th><th>Bytes</th><th>Description</th></tr>
+<tr><td><code>ceq ra, rb</code></td><td>1</td><td>C = (ra == rb)</td></tr>
+<tr><td><code>clu ra, rb</code></td><td>1</td><td>C = (ra &lt; rb) unsigned</td></tr>
+<tr><td><code>cls ra, rb</code></td><td>1</td><td>C = (ra &lt; rb) signed</td></tr>
+</table>
+<p>Use <code>z</code> register for zero tests: <code>ceq r0, z</code> sets C if r0 == 0.</p>
 
-<h4>Compare Instructions (set C flag)</h4>
-<p><strong>ceq ra,rb</strong> - C = (ra == rb)</p>
-<p><strong>cls ra,rb</strong> - C = (ra < rb) signed</p>
-<p><strong>clu ra,rb</strong> - C = (ra < rb) unsigned</p>
+<h4>Branch (PC-relative, signed 8-bit offset)</h4>
+<table>
+<tr><th>Instruction</th><th>Bytes</th><th>Description</th></tr>
+<tr><td><code>bra label</code></td><td>2</td><td>Branch always</td></tr>
+<tr><td><code>brt label</code></td><td>2</td><td>Branch if C = true</td></tr>
+<tr><td><code>brf label</code></td><td>2</td><td>Branch if C = false</td></tr>
+</table>
 
-<h4>Branch Instructions</h4>
-<p><strong>bra dd</strong> - Branch always (PC-relative)</p>
-<p><strong>brt dd</strong> - Branch if C=true</p>
-<p><strong>brf dd</strong> - Branch if C=false</p>
+<h4>Memory Access (base + signed 8-bit offset)</h4>
+<table>
+<tr><th>Instruction</th><th>Bytes</th><th>Description</th></tr>
+<tr><td><code>lb ra, dd(rb)</code></td><td>2</td><td>Load byte, sign-extend to 24 bits</td></tr>
+<tr><td><code>lbu ra, dd(rb)</code></td><td>2</td><td>Load byte, zero-extend to 24 bits</td></tr>
+<tr><td><code>lw ra, dd(rb)</code></td><td>2</td><td>Load word (3 bytes, little-endian)</td></tr>
+<tr><td><code>sb ra, dd(rb)</code></td><td>2</td><td>Store byte (low 8 bits of ra)</td></tr>
+<tr><td><code>sw ra, dd(rb)</code></td><td>2</td><td>Store word (3 bytes, little-endian)</td></tr>
+</table>
+<p>Valid base registers: r0, r1, r2, fp. (Not sp — use <code>mov fp, sp</code> then fp.)</p>
 
-<h4>Memory Instructions</h4>
-<p><strong>lb ra,dd(rb)</strong> - Load byte signed</p>
-<p><strong>lbu ra,dd(rb)</strong> - Load byte unsigned</p>
-<p><strong>lw ra,dd(rb)</strong> - Load word (3 bytes)</p>
-<p><strong>sb ra,dd(rb)</strong> - Store byte</p>
-<p><strong>sw ra,dd(rb)</strong> - Store word</p>
+<h4>Stack</h4>
+<table>
+<tr><th>Instruction</th><th>Bytes</th><th>Description</th></tr>
+<tr><td><code>push ra</code></td><td>1</td><td>sp -= 3; store ra at sp (word)</td></tr>
+<tr><td><code>pop ra</code></td><td>1</td><td>Load ra from sp; sp += 3 (word)</td></tr>
+</table>
+<p>Can push/pop: r0, r1, r2, fp.</p>
 
-<h4>Stack Instructions</h4>
-<p><strong>push ra</strong> - Decrement sp, store ra</p>
-<p><strong>pop ra</strong> - Load ra, increment sp</p>
+<h4>Jump &amp; Call</h4>
+<table>
+<tr><th>Instruction</th><th>Bytes</th><th>Description</th></tr>
+<tr><td><code>jmp (ra)</code></td><td>1</td><td>PC = ra (unconditional jump)</td></tr>
+<tr><td><code>jal ra, (rb)</code></td><td>1</td><td>ra = return addr; PC = rb (jump and link)</td></tr>
+</table>
 
-<h4>Jump Instructions</h4>
-<p><strong>jmp (ra)</strong> - Jump to address in ra</p>
-<p><strong>jal ra,(rb)</strong> - Jump and link (call)</p>
+<h4>Register Move</h4>
+<table>
+<tr><th>Instruction</th><th>Bytes</th><th>Description</th></tr>
+<tr><td><code>mov ra, rb</code></td><td>1</td><td>ra = rb (copy register)</td></tr>
+<tr><td><code>mov ra, c</code></td><td>1</td><td>ra = condition flag (0 or 1)</td></tr>
+<tr><td><code>mov iv, ra</code></td><td>1</td><td>Set interrupt vector</td></tr>
+<tr><td><code>mov fp, sp</code></td><td>1</td><td>Save stack pointer to frame pointer</td></tr>
+<tr><td><code>mov sp, fp</code></td><td>1</td><td>Restore stack pointer from frame pointer</td></tr>
+</table>
 
-<h4>Extension Instructions</h4>
-<p><strong>sxt ra</strong> - Sign-extend byte to 24-bit word</p>
-<p><strong>zxt ra</strong> - Zero-extend byte to 24-bit word</p>
-
-<h4>Register Operations</h4>
-<p><strong>mov ra,rb</strong> - Copy register</p>
-<p><strong>mov ra,c</strong> - Move condition flag to register (0 or 1)</p>
+<h4>Extensions</h4>
+<table>
+<tr><th>Instruction</th><th>Bytes</th><th>Description</th></tr>
+<tr><td><code>sxt ra</code></td><td>1</td><td>Sign-extend byte: bits 8..23 = bit 7</td></tr>
+<tr><td><code>zxt ra</code></td><td>1</td><td>Zero-extend byte: bits 8..23 = 0</td></tr>
+<tr><td><code>nop</code></td><td>1</td><td>No operation (encoded as <code>add r0, r0</code>)</td></tr>
+</table>
 
 <h4>Idioms</h4>
-<p><strong>halt: bra halt</strong> - Stop execution (branch-to-self infinite loop)</p>
-<p><strong>nop</strong> - No operation (encoded as add r0,r0)</p>
+<table>
+<tr><th>Pattern</th><th>Meaning</th></tr>
+<tr><td><pre>halt:
+        bra halt</pre></td><td>Halt (branch-to-self; emulator detects this)</td></tr>
+<tr><td><pre>        la  r2, func
+        jal r1, (r2)</pre></td><td>Call function (r1 = return address)</td></tr>
+<tr><td><pre>        jmp (r1)</pre></td><td>Return from function</td></tr>
+<tr><td><pre>        jmp (ir)</pre></td><td>Return from interrupt</td></tr>
+</table>
 
 <h4>Memory Map</h4>
-<table style="font-size:0.85em">
-<tr><td><code>000000-0FFFFF</code></td><td>SRAM (1 MB)</td></tr>
-<tr><td><code>FEE000-FEFFFF</code></td><td>EBR — 3 KB on MachXO (8 KB address range)</td></tr>
-<tr><td><code>FEEC00</code></td><td>Initial SP (top of 3 KB EBR stack)</td></tr>
-<tr><td><code>FF0000</code></td><td>LED (write bit 0) / Button (read bit 0)</td></tr>
-<tr><td><code>FF0100</code></td><td>UART data</td></tr>
-<tr><td><code>FF0101</code></td><td>UART status (bit 0 = TX busy, bit 1 = RX ready)</td></tr>
+<table>
+<tr><th>Address Range</th><th>Region</th><th>Notes</th></tr>
+<tr><td><code>000000-0FFFFF</code></td><td>SRAM (1 MB)</td><td>Code at low addresses, data/globals above</td></tr>
+<tr><td><code>FEE000-FEFFFF</code></td><td>EBR (8 KB range)</td><td>3 KB on MachXO FPGA; used for stack</td></tr>
+<tr><td><code>FEEC00</code></td><td>Initial SP</td><td>Top of 3 KB EBR stack</td></tr>
+<tr><td><code>FF0000</code></td><td>LED / Button</td><td>Write bit 0 = LED D2. Read bit 0 = button S2</td></tr>
+<tr><td><code>FF0010</code></td><td>Interrupt enable</td><td>Write bit 0 = enable UART RX interrupt</td></tr>
+<tr><td><code>FF0100</code></td><td>UART data</td><td>Write = TX. Read = RX (acknowledges interrupt)</td></tr>
+<tr><td><code>FF0101</code></td><td>UART status</td><td>Bit 7 = TX busy. Bit 1 = RX data ready</td></tr>
 </table>
+
+<h4>Assembly Syntax</h4>
+<pre>; Comments start with semicolon
+label:                   ; labels on own line (as24 compatible)
+        lc  r0, 42      ; instruction with operands
+.local:                  ; local labels start with dot
+        bra .local</pre>
+<p>Numbers: decimal (<code>42</code>) or signed decimal for addresses (<code>la r1, -65536</code> = 0xFF0000).</p>
 "#;
 
 const HELP_CONTENT: &str = r#"
