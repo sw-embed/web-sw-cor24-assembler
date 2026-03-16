@@ -1,52 +1,51 @@
-Assembled 178 bytes
+Assembled 141 bytes
 Running (speed: max IPS, time limit: 5s)...
 
-[UART TX @ 79] 'H'  (0x48)
-[UART TX @ 79] 'e'  (0x65)
-[UART TX @ 79] 'l'  (0x6C)
-[UART TX @ 79] 'l'  (0x6C)
-[UART TX @ 79] 'o'  (0x6F)
-[UART TX @ 79] '\n'
+[UART TX @ 78] 'H'  (0x48)
+[UART TX @ 78] 'e'  (0x65)
+[UART TX @ 78] 'l'  (0x6C)
+[UART TX @ 78] 'l'  (0x6C)
+[UART TX @ 78] 'o'  (0x6F)
+[UART TX @ 78] '\n'
 
 UART output: Hello
 
 
-Executed 79 instructions
+Executed 78 instructions
 CPU halted (self-branch detected)
 
 === Registers ===
-  PC:  0x000098    C: 0
+  PC:  0x000074    C: 0
   r0:  0xFF0100  (16711936)
-  r1:  0x00000A  (      10)
-  r2:  0x000098  (     152)
+  r1:  0x000081  (     129)
+  r2:  0x00000A  (      10)
   fp:  0xFEEC00
   sp:  0xFEEBFD
 
 === Emulator ===
-  Instructions: 79
+  Instructions: 78
   Halted: true
 
 === SRAM 000000-0FFFFF (1 MB) ===
-  000000: 65 29 9E 00 00 26 44 50 2B 12 00 00 7F 2B A8 00  |e)...&DP+....+..|
-  000010: 00 28 44 41 2B 1E 00 00 7F 2B A8 00 00 28 44 4E  |.(DA+....+...(DN|
-  000020: 2B 2A 00 00 7F 2B A8 00 00 28 44 49 2B 36 00 00  |+*...+...(DI+6..|
-  000030: 7F 2B A8 00 00 28 44 43 2B 42 00 00 7F 2B A8 00  |.+...(DC+B...+..|
-  000040: 00 28 44 0A 2B 4E 00 00 7F 2B A8 00 00 28 13 FC  |.(D.+N...+...(..|
-  000050: 44 48 2B 5C 00 00 7F 2B A8 00 00 28 44 65 2B 68  |DH+\...+...(De+h|
-  000060: 00 00 7F 2B A8 00 00 28 44 6C 2B 74 00 00 7F 2B  |...+...(Dl+t...+|
-  000070: A8 00 00 28 44 6C 2B 80 00 00 7F 2B A8 00 00 28  |...(Dl+....+...(|
-  000080: 44 6F 2B 8C 00 00 7F 2B A8 00 00 28 44 0A 2B 98  |Do+....+...(D.+.|
-  000090: 00 00 7F 2B A8 00 00 28 13 FC 84 00 7B 28 2B A8  |...+...(....{(+.|
-  0000A0: 00 00 7F 2B 50 00 00 28 5A 29 00 01 FF 2B 9A 00  |...+P..(Z)...+..|
-  0000B0: 00 28 00 00 00 00 00 00 00 00 00 00 00 00 00 00  |.(..............|
-  0000C0..0FFFFF: 1048384 bytes all zero
+  000000: 65 29 7B 00 00 26 44 50 7E 2B 82 00 00 D2 7A 44  |e){..&DP~+....zD|
+  000010: 41 7E 2B 82 00 00 D2 7A 44 4E 7E 2B 82 00 00 D2  |A~+....zDN~+....|
+  000020: 7A 44 49 7E 2B 82 00 00 D2 7A 44 43 7E 2B 82 00  |zDI~+....zDC~+..|
+  000030: 00 D2 7A 44 0A 7E 2B 82 00 00 D2 7A 13 FC 44 48  |..zD.~+....z..DH|
+  000040: 7E 2B 82 00 00 D2 7A 44 65 7E 2B 82 00 00 D2 7A  |~+....zDe~+....z|
+  000050: 44 6C 7E 2B 82 00 00 D2 7A 44 6C 7E 2B 82 00 00  |Dl~+....zDl~+...|
+  000060: D2 7A 44 6F 7E 2B 82 00 00 D2 7A 44 0A 7E 2B 82  |.zDo~+....zD.~+.|
+  000070: 00 00 D2 7A 13 FC 55 18 87 00 27 7E 2B 3E 00 00  |...z..U...'~+>..|
+  000080: D2 7A A6 18 29 00 01 FF 2B 76 00 00 28 00 00 00  |.z..)...+v..(...|
+  000090..0FFFFF: 1048432 bytes all zero
 
 === Unmapped 100000-FEDDFF (14.9 MB, not installed) ===
 
 === EBR FEE000-FEFFFF (8 KB, stack) ===
   FEE000..FEEBEF: 3056 bytes all zero
-  FEEBF0: 00 00 00 00 00 00 00 00 00 00 98 00 00 A8 00 00  |................|
-  FEEC00..FEFFFF: 5120 bytes all zero
+  FEEBF0: 00 00 00 00 00 00 00 00 00 00 81 00 00 00 00 00  |................|
+  FEEC00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  |................|
+  FEEC10: 00 00 00 00 00 00 00 00 0A 00 00 00 00 00 00 00  |................|
+  FEEC20..FEFFFF: 5088 bytes all zero
 
 === I/O FF0000-FFFFFF (64 KB, memory-mapped peripherals) ===
   FF0000 LED:  0x00  [........]  BTN S2: released

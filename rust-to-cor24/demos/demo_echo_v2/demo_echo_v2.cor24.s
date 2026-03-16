@@ -8,7 +8,7 @@
 
 ; --- function: handle_rx ---
 handle_rx:
-    la      r0, 0xFF0100
+    la      r0, -65280
     ; call mmio_read
     push    r1
     la      r2, mmio_read
@@ -19,7 +19,7 @@ handle_rx:
     ceq     r0, r2
     pop     r2
     brf     .LBB0_2
-    la      r0, 0x000100
+    la      r0, 256
     push    r0
     lc      r0, 1
     sw      r0, 24(fp)
@@ -82,10 +82,10 @@ start:
     la r0, isr_handler
     mov r6, r0
     lc r0, 1
-    la r1, 0xFF0010
+    la r1, -65520
     sb r0, 0(r1)
 .LBB4_1:
-    la      r0, 0x000100
+    la      r0, 256
     ; call mmio_read
     push    r1
     la      r2, mmio_read
@@ -126,10 +126,9 @@ to_upper:
 ; --- function: uart_putc ---
 uart_putc:
     sw      r0, 24(fp)
-    la      r0, 0xFF0100
+    la      r0, -65280
     ; tail call mmio_write
     la      r2, mmio_write
     jmp     (r2)
 .Lfunc_end6:
-
 

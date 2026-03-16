@@ -41,30 +41,30 @@ pub unsafe fn isr_handler() {
         "; @cor24: mov r2, c",
         "; @cor24: push r2",
         // Read UART RX byte (acknowledges interrupt)
-        "; @cor24: la r1, 0xFF0100",
+        "; @cor24: la r1, -65280",
         "; @cor24: lb r0, 0(r1)",
         // Check for '!' (0x21) -> halt
         "; @cor24: mov r2, r0",
-        "; @cor24: lc r0, 0x21",
+        "; @cor24: lc r0, 33",
         "; @cor24: ceq r0, r2",
         "; @cor24: brt do_halt",
         // Check if lowercase: 0x61 ('a') <= ch <= 0x7A ('z')
-        "; @cor24: lc r0, 0x61",
+        "; @cor24: lc r0, 97",
         "; @cor24: clu r2, r0",
         "; @cor24: brt not_lower",
-        "; @cor24: lc r0, 0x7B",
+        "; @cor24: lc r0, 123",
         "; @cor24: clu r2, r0",
         "; @cor24: brf not_lower",
         // Lowercase: convert to uppercase (AND 0xDF) and echo
         "; @cor24: mov r0, r2",
-        "; @cor24: lc r1, 0xDF",
+        "; @cor24: lcu r1, 223",
         "; @cor24: and r0, r1",
-        "; @cor24: la r1, 0xFF0100",
+        "; @cor24: la r1, -65280",
         "; @cor24: sb r0, 0(r1)",
         "; @cor24: bra isr_done",
         // Not lowercase: echo character as-is (already uppercase or non-letter)
         "; @cor24: not_lower:",
-        "; @cor24: la r1, 0xFF0100",
+        "; @cor24: la r1, -65280",
         "; @cor24: sb r2, 0(r1)",
         // Restore registers and return from interrupt
         "; @cor24: isr_done:",
@@ -95,7 +95,7 @@ pub unsafe fn start() -> ! {
     // Enable UART RX interrupt (bit 0 of 0xFF0010)
     core::arch::asm!(
         "; @cor24: lc r0, 1",
-        "; @cor24: la r1, 0xFF0010",
+        "; @cor24: la r1, -65520",
         "; @cor24: sb r0, 0(r1)",
     );
 

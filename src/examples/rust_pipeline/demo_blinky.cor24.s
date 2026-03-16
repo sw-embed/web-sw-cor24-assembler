@@ -71,7 +71,7 @@ delay:
 ; --- function: demo_blinky ---
 demo_blinky:
 .LBB2_1:
-    la      r0, 0xFF0000
+    la      r0, -65536
     push    r0
     lc      r0, 1
     sw      r0, 24(fp)
@@ -81,13 +81,13 @@ demo_blinky:
     la      r2, mmio_write
     jal     r1, (r2)
     pop     r1
-    la      r0, 0x001388
+    la      r0, 5000
     ; call delay
     push    r1
     la      r2, delay
     jal     r1, (r2)
     pop     r1
-    la      r0, 0xFF0000
+    la      r0, -65536
     push    r0
     lc      r0, 0
     sw      r0, 24(fp)
@@ -97,7 +97,7 @@ demo_blinky:
     la      r2, mmio_write
     jal     r1, (r2)
     pop     r1
-    la      r0, 0x001388
+    la      r0, 5000
     ; call delay
     push    r1
     la      r2, delay
@@ -125,10 +125,9 @@ start:
 ; --- function: uart_putc ---
 uart_putc:
     sw      r0, 24(fp)
-    la      r0, 0xFF0100
+    la      r0, -65280
     ; tail call mmio_write
     la      r2, mmio_write
     jmp     (r2)
 .Lfunc_end5:
-
 

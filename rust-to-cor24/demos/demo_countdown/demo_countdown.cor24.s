@@ -8,42 +8,6 @@
 
 ; --- function: _RNvCsgMG9zBUy57e_7___rustc17rust_begin_unwind ---
 _RNvCsgMG9zBUy57e_7___rustc17rust_begin_unwind:
-    lc      r0, 80
-    ; call uart_putc
-    push    r1
-    la      r2, uart_putc
-    jal     r1, (r2)
-    pop     r1
-    lc      r0, 65
-    ; call uart_putc
-    push    r1
-    la      r2, uart_putc
-    jal     r1, (r2)
-    pop     r1
-    lc      r0, 78
-    ; call uart_putc
-    push    r1
-    la      r2, uart_putc
-    jal     r1, (r2)
-    pop     r1
-    lc      r0, 73
-    ; call uart_putc
-    push    r1
-    la      r2, uart_putc
-    jal     r1, (r2)
-    pop     r1
-    lc      r0, 67
-    ; call uart_putc
-    push    r1
-    la      r2, uart_putc
-    jal     r1, (r2)
-    pop     r1
-    lc      r0, 10
-    ; call uart_putc
-    push    r1
-    la      r2, uart_putc
-    jal     r1, (r2)
-    pop     r1
 .LBB0_1:
     bra     .LBB0_1
 .Lfunc_end0:
@@ -79,17 +43,17 @@ demo_countdown:
     sw      r0, 18(fp)
     pop     r0
 .LBB2_1:
-    la      r0, 0xFF0000
+    la      r0, 256
     push    r0
     lw      r0, 18(fp)
     sw      r0, 24(fp)
     pop     r0
-    ; call mmio_write
+    ; call mem_write
     push    r1
-    la      r2, mmio_write
+    la      r2, mem_write
     jal     r1, (r2)
     pop     r1
-    la      r0, 0x0003E8
+    la      r0, 1000
     ; call delay
     push    r1
     la      r2, delay
@@ -105,22 +69,22 @@ demo_countdown:
     ceq     r0, z
     pop     r0
     brf     .LBB2_1
-    la      r0, 0xFF0000
+    la      r0, 256
     push    r0
     lc      r0, 0
     sw      r0, 24(fp)
     pop     r0
-    ; call mmio_write
+    ; call mem_write
     push    r1
-    la      r2, mmio_write
+    la      r2, mem_write
     jal     r1, (r2)
     pop     r1
 .LBB2_3:
     bra     .LBB2_3
 .Lfunc_end2:
 
-; --- function: mmio_write ---
-mmio_write:
+; --- function: mem_write ---
+mem_write:
     lw      r2, 24(fp)
     sb      r2, 0(r0)
     jmp     (r1)
@@ -134,14 +98,4 @@ start:
     jal     r1, (r2)
     pop     r1
 .Lfunc_end4:
-
-; --- function: uart_putc ---
-uart_putc:
-    sw      r0, 24(fp)
-    la      r0, 0xFF0100
-    ; tail call mmio_write
-    la      r2, mmio_write
-    jmp     (r2)
-.Lfunc_end5:
-
 

@@ -13,26 +13,26 @@ isr_handler:
     push r2
     mov r2, c
     push r2
-    la r1, 0xFF0100
+    la r1, -65280
     lb r0, 0(r1)
     mov r2, r0
-    lc r0, 0x21
+    lc r0, 33
     ceq r0, r2
     brt do_halt
-    lc r0, 0x61
+    lc r0, 97
     clu r2, r0
     brt not_lower
-    lc r0, 0x7B
+    lc r0, 123
     clu r2, r0
     brf not_lower
     mov r0, r2
-    lc r1, 0xDF
+    lcu r1, 223
     and r0, r1
-    la r1, 0xFF0100
+    la r1, -65280
     sb r0, 0(r1)
     bra isr_done
 not_lower:
-    la r1, 0xFF0100
+    la r1, -65280
     sb r2, 0(r1)
 isr_done:
     pop r2
@@ -63,7 +63,7 @@ start:
     la r0, isr_handler
     mov r6, r0
     lc r0, 1
-    la r1, 0xFF0010
+    la r1, -65520
     sb r0, 0(r1)
 .LBB2_1:
     nop
@@ -74,10 +74,9 @@ start:
 ; --- function: uart_putc ---
 uart_putc:
     sw      r0, 24(fp)
-    la      r0, 0xFF0100
+    la      r0, -65280
     ; tail call mmio_write
     la      r2, mmio_write
     jmp     (r2)
 .Lfunc_end3:
-
 

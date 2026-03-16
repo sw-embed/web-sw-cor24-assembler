@@ -28,7 +28,8 @@ _RNvCsgMG9zBUy57e_7___rustc17rust_begin_unwind:
 	.type	demo_nested,@function
 demo_nested:
 	mov	#-256, r12
-	call	#mmio_read
+	call	#mem_read
+	mov.b	r12, r12
 	add	#5, r12
 	call	#level_a
 .Lfunc_end1:
@@ -64,8 +65,8 @@ level_c:
 	push	r10
 	mov	r13, r10
 	mov	r12, r13
-	mov	#-256, r12
-	call	#mmio_write
+	mov	#256, r12
+	call	#mem_write
 	mov	r10, r12
 	call	#uart_putc
 .LBB4_1:
@@ -73,25 +74,25 @@ level_c:
 .Lfunc_end4:
 	.size	level_c, .Lfunc_end4-level_c
 
-	.section	.text.mmio_read,"ax",@progbits
-	.globl	mmio_read
+	.section	.text.mem_read,"ax",@progbits
+	.globl	mem_read
 	.p2align	1
-	.type	mmio_read,@function
-mmio_read:
+	.type	mem_read,@function
+mem_read:
 	mov.b	0(r12), r12
 	ret
 .Lfunc_end5:
-	.size	mmio_read, .Lfunc_end5-mmio_read
+	.size	mem_read, .Lfunc_end5-mem_read
 
-	.section	.text.mmio_write,"ax",@progbits
-	.globl	mmio_write
+	.section	.text.mem_write,"ax",@progbits
+	.globl	mem_write
 	.p2align	1
-	.type	mmio_write,@function
-mmio_write:
+	.type	mem_write,@function
+mem_write:
 	mov.b	r13, 0(r12)
 	ret
 .Lfunc_end6:
-	.size	mmio_write, .Lfunc_end6-mmio_write
+	.size	mem_write, .Lfunc_end6-mem_write
 
 	.section	.text.start,"ax",@progbits
 	.globl	start
@@ -109,7 +110,7 @@ start:
 uart_putc:
 	mov	r12, r13
 	mov	#-255, r12
-	call	#mmio_write
+	call	#mem_write
 	ret
 .Lfunc_end8:
 	.size	uart_putc, .Lfunc_end8-uart_putc

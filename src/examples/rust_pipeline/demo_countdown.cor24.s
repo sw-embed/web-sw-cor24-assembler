@@ -43,7 +43,7 @@ demo_countdown:
     sw      r0, 18(fp)
     pop     r0
 .LBB2_1:
-    la      r0, 0x000100
+    la      r0, 256
     push    r0
     lw      r0, 18(fp)
     sw      r0, 24(fp)
@@ -53,7 +53,7 @@ demo_countdown:
     la      r2, mem_write
     jal     r1, (r2)
     pop     r1
-    la      r0, 0x0003E8
+    la      r0, 1000
     ; call delay
     push    r1
     la      r2, delay
@@ -69,7 +69,7 @@ demo_countdown:
     ceq     r0, z
     pop     r0
     brf     .LBB2_1
-    la      r0, 0x000100
+    la      r0, 256
     push    r0
     lc      r0, 0
     sw      r0, 24(fp)
@@ -98,5 +98,4 @@ start:
     jal     r1, (r2)
     pop     r1
 .Lfunc_end4:
-
 

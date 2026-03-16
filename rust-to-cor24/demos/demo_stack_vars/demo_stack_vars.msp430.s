@@ -47,8 +47,8 @@ accumulate:
 	mov	r8, r7
 	add	r9, r7
 	xor	r7, r13
-	mov	#-256, r12
-	call	#mmio_write
+	mov	#256, r12
+	call	#mem_write
 	mov	r6, r12
 	call	#uart_putc
 	mov	r10, r12
@@ -70,31 +70,32 @@ accumulate:
 	.type	demo_stack_vars,@function
 demo_stack_vars:
 	mov	#-256, r12
-	call	#mmio_read
+	call	#mem_read
+	mov.b	r12, r12
 	inc	r12
 	call	#accumulate
 .Lfunc_end2:
 	.size	demo_stack_vars, .Lfunc_end2-demo_stack_vars
 
-	.section	.text.mmio_read,"ax",@progbits
-	.globl	mmio_read
+	.section	.text.mem_read,"ax",@progbits
+	.globl	mem_read
 	.p2align	1
-	.type	mmio_read,@function
-mmio_read:
+	.type	mem_read,@function
+mem_read:
 	mov.b	0(r12), r12
 	ret
 .Lfunc_end3:
-	.size	mmio_read, .Lfunc_end3-mmio_read
+	.size	mem_read, .Lfunc_end3-mem_read
 
-	.section	.text.mmio_write,"ax",@progbits
-	.globl	mmio_write
+	.section	.text.mem_write,"ax",@progbits
+	.globl	mem_write
 	.p2align	1
-	.type	mmio_write,@function
-mmio_write:
+	.type	mem_write,@function
+mem_write:
 	mov.b	r13, 0(r12)
 	ret
 .Lfunc_end4:
-	.size	mmio_write, .Lfunc_end4-mmio_write
+	.size	mem_write, .Lfunc_end4-mem_write
 
 	.section	.text.start,"ax",@progbits
 	.globl	start
@@ -112,7 +113,7 @@ start:
 uart_putc:
 	mov	r12, r13
 	mov	#-255, r12
-	call	#mmio_write
+	call	#mem_write
 	ret
 .Lfunc_end6:
 	.size	uart_putc, .Lfunc_end6-uart_putc

@@ -17,7 +17,7 @@ _RNvCsgMG9zBUy57e_7___rustc17rust_begin_unwind:
 
 ; --- function: demo_panic ---
 demo_panic:
-    la      r0, 0xFF0000
+    la      r0, -65536
     push    r0
     lc      r0, 1
     sw      r0, 24(fp)
@@ -95,10 +95,9 @@ start:
 ; --- function: uart_putc ---
 uart_putc:
     sw      r0, 24(fp)
-    la      r0, 0xFF0100
+    la      r0, -65280
     ; tail call mmio_write
     la      r2, mmio_write
     jmp     (r2)
 .Lfunc_end5:
-
 

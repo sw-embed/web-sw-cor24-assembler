@@ -441,7 +441,7 @@ fn translate_binary_op(cor24_op: &str, ops: &[MspOperand], byte_mode: bool) -> R
                     result.push(format!("add     {}, {}", dst, val));
                 } else {
                     let tmp = temp_reg(&dst);
-                    result.push(format!("la      {}, 0x{:06X}", tmp, val as u32 & 0xFFFFFF));
+                    result.push(format!("la      {}, {}", tmp, fmt_imm24(val as u32)));
                     result.push(format!("add     {}, {}", dst, tmp));
                 }
             } else {
@@ -455,7 +455,7 @@ fn translate_binary_op(cor24_op: &str, ops: &[MspOperand], byte_mode: bool) -> R
 
     if byte_mode && dst != "sp" {
         let tmp = temp_reg(&dst);
-        result.push(format!("lcu     {}, 0xFF", tmp));
+        result.push(format!("lcu     {}, 255", tmp));
         result.push(format!("and     {}, {}", dst, tmp));
     }
 
@@ -562,7 +562,7 @@ fn translate_bic(ops: &[MspOperand]) -> Result<Vec<String>> {
             let src = map_register(*r)?;
             let tmp = temp_reg(&dst);
             // tmp = 0xFFFFFF
-            result.push(format!("la      {}, 0xFFFFFF", tmp));
+            result.push(format!("la      {}, -1", tmp));
             // tmp = tmp XOR src = ~src
             result.push(format!("xor     {}, {}", tmp, src));
             // dst = dst AND tmp
@@ -722,7 +722,7 @@ fn translate_cmp(ops: &[MspOperand], byte_mode: bool, use_ceq: bool) -> Result<V
     // If byte mode, mask dst to 8 bits first
     if byte_mode {
         let tmp = temp_reg(&dst);
-        result.push(format!("lcu     {}, 0xFF", tmp));
+        result.push(format!("lcu     {}, 255", tmp));
         result.push(format!("and     {}, {}", dst, tmp));
     }
 
@@ -1094,6 +1094,19 @@ fn map_io_address_imm(val: i32) -> i32 {
     }
 }
 
+/// Format a 24-bit value as signed decimal for as24 compatibility.
+/// Values with bit 23 set are emitted as negative (e.g., 0xFF0000 -> -65536).
+fn fmt_imm24(value: u32) -> String {
+    let masked = value & 0xFFFFFF;
+    if masked >= 0x800000 {
+        // Sign-extend to i32: treat as negative 24-bit value
+        let signed = masked as i32 - 0x1000000;
+        format!("{}", signed)
+    } else {
+        format!("{}", masked)
+    }
+}
+
 /// Load an immediate value into a COR24 register
 fn load_immediate(result: &mut Vec<String>, reg: &str, value: i32) {
     if value == 0 {
@@ -1101,7 +1114,7 @@ fn load_immediate(result: &mut Vec<String>, reg: &str, value: i32) {
     } else if (-128..=127).contains(&value) {
         result.push(format!("lc      {}, {}", reg, value));
     } else {
-        result.push(format!("la      {}, 0x{:06X}", reg, value as u32 & 0xFFFFFF));
+        result.push(format!("la      {}, {}", reg, fmt_imm24(value as u32)));
     }
 }
 
@@ -1410,7 +1423,7 @@ test:
 	ret
 "#;
         let result = translate_msp430(msp430, "start").unwrap();
-        assert!(result.contains("la      r0, 0x0003E8"));
+        assert!(result.contains("la      r0, 1000"));
     }
 
     #[test]
@@ -1456,7 +1469,7 @@ blink_loop:
         assert!(result.contains("jal     r1, (r2)"), "should use jal for calls. Got:\n{}", result);
         assert!(result.contains("push    r1"), "should save return addr. Got:\n{}", result);
         // I/O address should be mapped: -256 (0xFF00) -> 0xFF0000
-        assert!(result.contains("la      r0, 0xFF0000"));
+        assert!(result.contains("la      r0, -65536"));
     }
 
     #[test]

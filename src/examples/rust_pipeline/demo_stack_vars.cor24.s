@@ -160,7 +160,7 @@ accumulate:
     pop     r2
     sw      r0, 24(fp)
     pop     r0
-    la      r0, 0x000100
+    la      r0, 256
     ; call mem_write
     push    r1
     la      r2, mem_write
@@ -202,7 +202,7 @@ accumulate:
 
 ; --- function: demo_stack_vars ---
 demo_stack_vars:
-    la      r0, 0xFF0000
+    la      r0, -65536
     ; call mem_read
     push    r1
     la      r2, mem_read
@@ -241,10 +241,9 @@ start:
 ; --- function: uart_putc ---
 uart_putc:
     sw      r0, 24(fp)
-    la      r0, 0xFF0100
+    la      r0, -65280
     ; tail call mem_write
     la      r2, mem_write
     jmp     (r2)
 .Lfunc_end6:
-
 

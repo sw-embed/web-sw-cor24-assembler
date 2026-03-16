@@ -6,28 +6,22 @@
     la      r0, start
     jmp     (r0)
 
+; --- function: _RNvCsgMG9zBUy57e_7___rustc17rust_begin_unwind ---
+_RNvCsgMG9zBUy57e_7___rustc17rust_begin_unwind:
+.LBB0_1:
+    bra     .LBB0_1
+.Lfunc_end0:
+
 ; --- function: demo_add ---
 demo_add:
-    la      r0, 0x000156
+    la      r0, 342
     jmp     (r1)
-.Lfunc_end0:
+.Lfunc_end1:
 
 ; --- function: start ---
 start:
-    ; call demo_add
-    push    r1
-    la      r2, demo_add
-    jal     r1, (r2)
-    pop     r1
-    ; TODO: mov (unsupported mov operand combination: Register(12) -> Absolute(()))
-.LBB1_1:
-    bra     .LBB1_1
-.Lfunc_end1:
-
-; --- function: _RNvCsgMG9zBUy57e_7___rustc17rust_begin_unwind ---
-_RNvCsgMG9zBUy57e_7___rustc17rust_begin_unwind:
+    ; TODO: mov (unsupported mov operand combination: Immediate(342) -> Absolute(()))
 .LBB2_1:
     bra     .LBB2_1
 .Lfunc_end2:
-
 

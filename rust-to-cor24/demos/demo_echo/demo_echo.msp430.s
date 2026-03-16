@@ -10,26 +10,26 @@ isr_handler:
 	; @cor24: push r2
 	; @cor24: mov r2, c
 	; @cor24: push r2
-	; @cor24: la r1, 0xFF0100
+	; @cor24: la r1, -65280
 	; @cor24: lb r0, 0(r1)
 	; @cor24: mov r2, r0
-	; @cor24: lc r0, 0x21
+	; @cor24: lc r0, 33
 	; @cor24: ceq r0, r2
 	; @cor24: brt do_halt
-	; @cor24: lc r0, 0x61
+	; @cor24: lc r0, 97
 	; @cor24: clu r2, r0
 	; @cor24: brt not_lower
-	; @cor24: lc r0, 0x7B
+	; @cor24: lc r0, 123
 	; @cor24: clu r2, r0
 	; @cor24: brf not_lower
 	; @cor24: mov r0, r2
-	; @cor24: lc r1, 0xDF
+	; @cor24: lcu r1, 223
 	; @cor24: and r0, r1
-	; @cor24: la r1, 0xFF0100
+	; @cor24: la r1, -65280
 	; @cor24: sb r0, 0(r1)
 	; @cor24: bra isr_done
 	; @cor24: not_lower:
-	; @cor24: la r1, 0xFF0100
+	; @cor24: la r1, -65280
 	; @cor24: sb r2, 0(r1)
 	; @cor24: isr_done:
 	; @cor24: pop r2
@@ -67,7 +67,7 @@ start:
 	;NO_APP
 	;APP
 	; @cor24: lc r0, 1
-	; @cor24: la r1, 0xFF0010
+	; @cor24: la r1, -65520
 	; @cor24: sb r0, 0(r1)
 	;NO_APP
 .LBB2_1:

@@ -6,38 +6,6 @@
     la      r0, start
     jmp     (r0)
 
-; --- function: handle_rx ---
-handle_rx:
-    la      r0, 0xFF0100
-    ; call mmio_read
-    push    r1
-    la      r2, mmio_read
-    jal     r1, (r2)
-    pop     r1
-    push    r2
-    lc      r2, 33
-    ceq     r0, r2
-    pop     r2
-    brf     .LBB0_2
-    la      r0, 0x000100
-    push    r0
-    lc      r0, 1
-    sw      r0, 24(fp)
-    pop     r0
-    ; tail call mmio_write
-    la      r2, mmio_write
-    jmp     (r2)
-.LBB0_2:
-    ; call to_upper
-    push    r1
-    la      r2, to_upper
-    jal     r1, (r2)
-    pop     r1
-    ; tail call uart_putc
-    la      r2, uart_putc
-    jmp     (r2)
-.Lfunc_end0:
-
 ; --- function: isr_handler ---
 isr_handler:
     push r0
@@ -45,31 +13,44 @@ isr_handler:
     push r2
     mov r2, c
     push r2
-    ; call handle_rx
-    push    r1
-    la      r2, handle_rx
-    jal     r1, (r2)
-    pop     r1
+    la r1, -65280
+    lb r0, 0(r1)
+    mov r2, r0
+    lc r0, 33
+    ceq r0, r2
+    brt do_halt
+    lc r0, 97
+    clu r2, r0
+    brt not_lower
+    lc r0, 123
+    clu r2, r0
+    brf not_lower
+    mov r0, r2
+    lcu r1, 223
+    and r0, r1
+    la r1, -65280
+    sb r0, 0(r1)
+    bra isr_done
+not_lower:
+    la r1, -65280
+    sb r2, 0(r1)
+isr_done:
     pop r2
     clu z, r2
     pop r2
     pop r1
     pop r0
     jmp (ir)
-.Lfunc_end1:
-
-; --- function: mmio_read ---
-mmio_read:
-    lbu      r0, 0(r0)
-    jmp     (r1)
-.Lfunc_end2:
+do_halt:
+    bra do_halt
+.Lfunc_end0:
 
 ; --- function: mmio_write ---
 mmio_write:
     lw      r2, 24(fp)
     sb      r2, 0(r0)
     jmp     (r1)
-.Lfunc_end3:
+.Lfunc_end1:
 
 ; --- function: start ---
 start:
@@ -82,54 +63,20 @@ start:
     la r0, isr_handler
     mov r6, r0
     lc r0, 1
-    la r1, 0xFF0010
+    la r1, -65520
     sb r0, 0(r1)
-.LBB4_1:
-    la      r0, 0x000100
-    ; call mmio_read
-    push    r1
-    la      r2, mmio_read
-    jal     r1, (r2)
-    pop     r1
-    ceq     r0, z
-    brf     .LBB4_3
+.LBB2_1:
     nop
 
-    bra     .LBB4_1
-.LBB4_3:
-halted:
-    bra halted
-.Lfunc_end4:
-
-; --- function: to_upper ---
-to_upper:
-    sw      r0, 24(fp)
-    push    r0
-    lw      r0, 24(fp)
-    add     r0, -97
-    sw      r0, 24(fp)
-    pop     r0
-    push    r0
-    lw      r0, 24(fp)
-    push    r2
-    lc      r2, 26
-    clu     r0, r2
-    pop     r2
-    pop     r0
-    brf     .LBB5_2
-    lc      r2, 95
-    and     r0, r2
-.LBB5_2:
-    jmp     (r1)
-.Lfunc_end5:
+    bra     .LBB2_1
+.Lfunc_end2:
 
 ; --- function: uart_putc ---
 uart_putc:
     sw      r0, 24(fp)
-    la      r0, 0xFF0100
+    la      r0, -65280
     ; tail call mmio_write
     la      r2, mmio_write
     jmp     (r2)
-.Lfunc_end6:
-
+.Lfunc_end3:
 

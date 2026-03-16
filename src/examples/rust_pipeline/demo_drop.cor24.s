@@ -58,13 +58,13 @@ mem_write:
 ; --- function: start ---
 start:
     sub     sp, 3
-    la      r0, 0x000100
+    la      r0, 256
     ; call guard_new
     push    r1
     la      r2, guard_new
     jal     r1, (r2)
     pop     r1
-    la      r0, 0x000100
+    la      r0, 256
     mov     r2, sp
     sw      r0, 0(r2)
     mov     r0, sp
@@ -73,9 +73,9 @@ start:
     la      r2, _RNvXs_Csdm5oPmm48S1_9demo_dropNtB4_5GuardNtNtNtCshbXD54rZpVC_4core3ops4drop4Drop4drop
     jal     r1, (r2)
     pop     r1
-    la      r0, 0x000100
+    la      r0, 256
     push    r0
-    la      r0, 0x0000FF
+    la      r0, 255
     sw      r0, 24(fp)
     pop     r0
     ; call mem_write
@@ -86,5 +86,4 @@ start:
 .LBB4_1:
     bra     .LBB4_1
 .Lfunc_end4:
-
 

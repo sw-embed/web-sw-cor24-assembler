@@ -50,10 +50,10 @@ _RNvCsgMG9zBUy57e_7___rustc17rust_begin_unwind:
 
 ; --- function: demo_nested ---
 demo_nested:
-    la      r0, 0xFF0000
-    ; call mmio_read
+    la      r0, -65536
+    ; call mem_read
     push    r1
-    la      r2, mmio_read
+    la      r2, mem_read
     jal     r1, (r2)
     pop     r1
     add     r0, 5
@@ -97,10 +97,10 @@ level_c:
     sw      r0, 18(fp)
     pop     r0
     sw      r0, 24(fp)
-    la      r0, 0xFF0000
-    ; call mmio_write
+    la      r0, 256
+    ; call mem_write
     push    r1
-    la      r2, mmio_write
+    la      r2, mem_write
     jal     r1, (r2)
     pop     r1
     lw      r0, 18(fp)
@@ -113,14 +113,14 @@ level_c:
     bra     .LBB4_1
 .Lfunc_end4:
 
-; --- function: mmio_read ---
-mmio_read:
+; --- function: mem_read ---
+mem_read:
     lbu      r0, 0(r0)
     jmp     (r1)
 .Lfunc_end5:
 
-; --- function: mmio_write ---
-mmio_write:
+; --- function: mem_write ---
+mem_write:
     lw      r2, 24(fp)
     sb      r2, 0(r0)
     jmp     (r1)
@@ -138,10 +138,9 @@ start:
 ; --- function: uart_putc ---
 uart_putc:
     sw      r0, 24(fp)
-    la      r0, 0xFF0100
-    ; tail call mmio_write
-    la      r2, mmio_write
+    la      r0, -65280
+    ; tail call mem_write
+    la      r2, mem_write
     jmp     (r2)
 .Lfunc_end8:
-
 

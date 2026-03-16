@@ -21,7 +21,7 @@ demo_fibonacci:
     jal     r1, (r2)
     pop     r1
     sw      r0, 24(fp)
-    la      r0, 0x000100
+    la      r0, 256
     ; call mem_write
     push    r1
     la      r2, mem_write
@@ -117,5 +117,4 @@ start:
     jal     r1, (r2)
     pop     r1
 .Lfunc_end4:
-
 
