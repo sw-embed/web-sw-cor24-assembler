@@ -1700,12 +1700,22 @@ header h1 {
     background: #1a1a2e;
 }
 
-/* Toolbar above editor/notebook for Examples/Challenges buttons */
-.editor-toolbar, .notebook-toolbar {
+.editor-column {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Toolbar above editor for Examples/Challenges buttons */
+.editor-toolbar {
     display: flex;
     gap: 8px;
-    padding: 6px 0;
-    margin-bottom: 4px;
+    padding: 4px 0;
+}
+
+.wizard-header-btn {
+    padding: 4px 8px;
+    text-align: center;
 }
 
 .toolbar-btn {

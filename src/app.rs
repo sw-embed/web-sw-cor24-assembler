@@ -1383,6 +1383,7 @@ pub fn app() -> Html {
 
             // Assembler Tab Content
             <div class={if *active_tab == "assembler" { "main-content" } else { "main-content hidden" }}>
+                <div class="editor-column">
                 <div class="editor-toolbar">
                     <button class="toolbar-btn"
                         data-tooltip="Load example programs"
@@ -1454,6 +1455,7 @@ pub fn app() -> Html {
                     run_enabled={*asm_assembled && !(*cpu).is_halted()}
                     show_exec_buttons={false}
                 />
+                </div> // editor-column
 
                 <div class="right-panels">
                     <DebugPanel

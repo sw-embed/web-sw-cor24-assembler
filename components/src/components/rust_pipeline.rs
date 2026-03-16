@@ -292,7 +292,14 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
 
             // Column 2: Wizard steps
             <div class="wizard-steps">
-                <div class="wizard-header-space"></div>
+                <div class="wizard-header-btn">
+                    <button class="toolbar-btn"
+                        data-tooltip="Load a pre-built Rust example"
+                        onclick={
+                            let cb = props.on_examples_open.clone();
+                            Callback::from(move |_: yew::MouseEvent| cb.emit(()))
+                        }>{"Examples"}</button>
+                </div>
 
                 {for all_steps.iter().map(|&step| {
                     // Step is completed if we're at or past it (and an example is loaded)
@@ -334,14 +341,6 @@ pub fn rust_pipeline(props: &RustPipelineProps) -> Html {
 
             // Column 3: Notebook cells
             <div class="notebook-cells" id="notebook-scroll">
-                <div class="notebook-toolbar">
-                    <button class="toolbar-btn"
-                        data-tooltip="Load a pre-built Rust example"
-                        onclick={
-                            let cb = props.on_examples_open.clone();
-                            Callback::from(move |_: yew::MouseEvent| cb.emit(()))
-                        }>{"Examples"}</button>
-                </div>
                 if let Some(example) = &props.loaded_example {
                     // Cell 1: Rust Source (always visible)
                     <div class="notebook-cell" id="cell-source">
