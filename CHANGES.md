@@ -16,6 +16,8 @@
 - Add Changes link in web UI footer (links to GitHub CHANGES.md)
 - Update README screenshots: assembler, C, and Rust tabs
 - Backfill CHANGES.md with full project history (Feb 25 - Mar 16)
+- Comprehensive tutorial: docs/cor24-tutorial.md and web UI Tutorial dialog
+  (registers, addressing modes, all instruction groups, I/O, interrupts, calling convention)
 
 ## 2026-03-15
 

@@ -1917,44 +1917,137 @@ wait2:  lc      r0,1
 halt:   bra     halt";
 
 const TUTORIAL_CONTENT: &str = r#"
-<h3>MakerLisp COR24 Assembly Emulator</h3>
-<p>This emulator teaches you assembly programming using the
-<a href="https://makerlisp.com" target="_blank">MakerLisp</a> COR24
-C-Oriented RISC architecture — a 24-bit soft CPU targeting Lattice MachXO FPGAs.</p>
+<h3>COR24 Assembly Tutorial</h3>
 
-<h4>CPU Features:</h4>
+<h4>What is the COR24?</h4>
+<p>The COR24 is a 24-bit RISC processor designed by Luther Johnson for the
+<a href="https://makerlisp.com" target="_blank">MakerLisp</a> project.
+It runs as a soft CPU on Lattice MachXO FPGAs. This emulator lets you write,
+assemble, and step through COR24 code in your browser.</p>
+
+<h4>Getting Started</h4>
+<ol>
+<li>Load an example from the <strong>Examples</strong> button</li>
+<li>Click <strong>Assemble</strong> to convert to machine code</li>
+<li>Click <strong>Step</strong> to execute one instruction (watch registers change)</li>
+<li>Click <strong>Run</strong> for continuous execution (<strong>Stop</strong> to pause)</li>
+<li>Expand <strong>Instruction Trace</strong> to see recent execution history</li>
+</ol>
+
+<h4>Registers</h4>
+<table style="font-size:0.85em; margin-bottom:8px">
+<tr><td><code>r0, r1, r2</code></td><td>General purpose (24-bit)</td></tr>
+<tr><td><code>fp (r3)</code></td><td>Frame pointer</td></tr>
+<tr><td><code>sp (r4)</code></td><td>Stack pointer (init: 0xFEEC00, grows down)</td></tr>
+<tr><td><code>z (r5)</code></td><td>Always zero — use in compares: <code>ceq r0,z</code></td></tr>
+<tr><td><code>iv (r6)</code></td><td>Interrupt vector (ISR address)</td></tr>
+<tr><td><code>ir (r7)</code></td><td>Interrupt return address</td></tr>
+</table>
+
+<h4>Loading Constants</h4>
+<pre>lc  r0, 42      ; signed 8-bit (-128..127)
+lcu r0, 200     ; unsigned 8-bit (0..255)
+la  r0, 1000    ; 24-bit immediate (any value)</pre>
+
+<h4>Arithmetic</h4>
+<pre>add r0, r1      ; r0 = r0 + r1
+add r0, 5       ; r0 = r0 + 5 (8-bit immediate)
+sub r0, r1      ; r0 = r0 - r1
+mul r0, r1      ; r0 = r0 * r1
+sub sp, 12      ; allocate stack space</pre>
+
+<h4>Logic &amp; Shifts</h4>
+<pre>and r0, r1      ; bitwise AND
+or  r0, r1      ; bitwise OR
+xor r0, r1      ; bitwise XOR
+shl r0, r1      ; shift left by r1
+srl r0, r1      ; shift right (zero fill)
+sra r0, r1      ; shift right (sign fill)</pre>
+
+<h4>Compare &amp; Branch</h4>
+<p>Compares set the condition flag <strong>C</strong>. Branches test it.</p>
+<pre>ceq r0, r1      ; C = (r0 == r1)
+clu r0, r1      ; C = (r0 &lt; r1) unsigned
+cls r0, r1      ; C = (r0 &lt; r1) signed
+bra label       ; branch always
+brt label       ; branch if C = true
+brf label       ; branch if C = false</pre>
+<p>Example — loop while r0 &lt; 10:</p>
+<pre>        lc  r0, 0
+loop:
+        add r0, 1
+        lc  r1, 10
+        clu r0, r1      ; C = (r0 &lt; 10)
+        brt loop</pre>
+
+<h4>Halting</h4>
+<p>No halt instruction — use branch-to-self:</p>
+<pre>halt:
+        bra halt         ; emulator detects this</pre>
+
+<h4>Register Moves</h4>
+<pre>mov r0, r1      ; copy register
+mov r0, c       ; r0 = condition flag (0 or 1)
+mov fp, sp      ; save stack pointer
+mov iv, r0      ; set interrupt vector</pre>
+
+<h4>Memory Access</h4>
+<p>Base+offset addressing. Offset is signed 8-bit. Base: r0, r1, r2, or fp.</p>
+<pre>sb  r0, 0(r1)   ; store byte
+sw  r0, 0(r1)   ; store word (3 bytes)
+lb  r0, 0(r1)   ; load byte (sign-extended)
+lbu r0, 0(r1)   ; load byte (zero-extended)
+lw  r0, 0(r1)   ; load word (3 bytes)</pre>
+
+<h4>Stack</h4>
+<pre>push r0         ; sp -= 3; mem[sp] = r0
+pop  r0         ; r0 = mem[sp]; sp += 3</pre>
+
+<h4>Function Calls</h4>
+<pre>; Call: load addr, jump-and-link
+        la  r2, my_func
+        jal r1, (r2)     ; r1 = return addr
+
+; Return:
+my_func:
+        push r1           ; save return addr
+        ; ... body ...
+        pop  r1
+        jmp  (r1)         ; return</pre>
+
+<h4>Memory-Mapped I/O</h4>
+<table style="font-size:0.85em; margin-bottom:8px">
+<tr><td><code>FF0000</code></td><td>LED (write bit 0) / Button (read bit 0)</td></tr>
+<tr><td><code>FF0010</code></td><td>Interrupt enable (bit 0 = UART RX)</td></tr>
+<tr><td><code>FF0100</code></td><td>UART data (read=RX, write=TX)</td></tr>
+<tr><td><code>FF0101</code></td><td>UART status (bit 7=TX busy, bit 1=RX ready)</td></tr>
+</table>
+<p>Use <code>la</code> with signed decimal: <code>la r1, -65536</code> = 0xFF0000</p>
+
+<h4>Extensions</h4>
+<pre>sxt r0          ; sign-extend byte to 24-bit
+zxt r0          ; zero-extend byte to 24-bit
+nop             ; no operation (encoded as add r0,r0)</pre>
+
+<h4>Instruction Sizes</h4>
+<table style="font-size:0.85em; margin-bottom:8px">
+<tr><td>1 byte</td><td>add, sub, mul, and, or, xor, mov, push, pop, jmp, jal, ceq, clu, cls, shl, srl, sra, sxt, zxt</td></tr>
+<tr><td>2 bytes</td><td>lc, lcu, add imm, bra, brt, brf, lb, lbu, lw, sb, sw</td></tr>
+<tr><td>4 bytes</td><td>la, sub sp</td></tr>
+</table>
+
+<h4>Tips</h4>
 <ul>
-    <li><strong>3 GP Registers (24-bit)</strong>: r0, r1, r2</li>
-    <li><strong>5 Special Registers</strong>: fp (r3), sp (r4), z (r5), iv (r6), ir (r7)</li>
-    <li><strong>32 Operations</strong>: Encoded into 211 instruction forms (1, 2, or 4 bytes)</li>
-    <li><strong>16 MB Address Space</strong>: 1 MB SRAM, 3 KB EBR (stack), memory-mapped I/O</li>
-    <li><strong>Single Condition Flag (C)</strong>: Set by compare instructions</li>
+<li>All Assembler tab examples are editable — experiment!</li>
+<li>C and Rust tab examples are read-only (compiled offline)</li>
+<li>Expand <strong>Instruction Trace</strong> after stepping to see execution history</li>
+<li>Use the <strong>ISA Reference</strong> button for quick instruction lookup</li>
+<li>Try <strong>Assert</strong> example to see validation patterns</li>
+<li>Try <strong>Loop Trace</strong> to practice Run/Stop/Trace workflow</li>
 </ul>
 
-<h4>Registers:</h4>
-<ul>
-    <li><code>r0, r1, r2</code> - General purpose (24-bit)</li>
-    <li><code>fp (r3)</code> - Frame Pointer</li>
-    <li><code>sp (r4)</code> - Stack Pointer (init: 0xFEEC00)</li>
-    <li><code>z (r5)</code> - Always zero; only usable in compare instructions (e.g. <code>ceq r0,z</code>)</li>
-    <li><code>iv (r6)</code> - Interrupt Vector</li>
-    <li><code>ir (r7)</code> - Interrupt Return address</li>
-</ul>
-
-<h4>Basic Instructions:</h4>
-<ul>
-    <li><code>lc ra,dd</code> - Load constant (signed 8-bit)</li>
-    <li><code>la ra,addr</code> - Load address (24-bit)</li>
-    <li><code>add ra,rb</code> - Add registers</li>
-    <li><code>add ra,dd</code> - Add immediate</li>
-    <li><code>sub ra,rb</code> - Subtract registers</li>
-    <li><code>cls ra,rb</code> - Compare less (signed), set C</li>
-    <li><code>brt dd</code> - Branch if C=true</li>
-    <li><code>brf dd</code> - Branch if C=false</li>
-    <li><code>push ra</code> - Push to stack</li>
-    <li><code>pop ra</code> - Pop from stack</li>
-    <li><code>halt: bra halt</code> - Stop (branch-to-self loop)</li>
-</ul>
+<p style="font-size:0.85em; color:#888">Full tutorial:
+<a href="https://github.com/sw-embed/cor24-rs/blob/main/docs/cor24-tutorial.md" target="_blank" style="color:#7c3aed">docs/cor24-tutorial.md</a></p>
 "#;
 
 const ISA_REF_CONTENT: &str = r#"
