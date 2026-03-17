@@ -345,7 +345,7 @@ impl Assembler {
             "zxt" => self.encode_alu(&operands, Opcode::Zxt, "zxt", line_num),
 
             // Pseudo-instructions
-            "nop" => vec![0x00],  // add r0,r0
+            "nop" => vec![0xFF],
 
             _ => {
                 self.errors.push(format!(

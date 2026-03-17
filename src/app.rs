@@ -2025,7 +2025,7 @@ my_func:
 <h4>Extensions</h4>
 <pre>sxt r0          ; sign-extend byte to 24-bit
 zxt r0          ; zero-extend byte to 24-bit
-nop             ; no operation (encoded as add r0,r0)</pre>
+nop             ; no operation (0xFF, 1 byte)</pre>
 
 <h4>Instruction Sizes</h4>
 <table style="font-size:0.85em; margin-bottom:8px">
@@ -2164,7 +2164,7 @@ See <a href="https://makerlisp.com" target="_blank">makerlisp.com</a> for the ha
 <tr><th>Instruction</th><th>Bytes</th><th>Description</th></tr>
 <tr><td><code>sxt ra</code></td><td>1</td><td>Sign-extend byte: bits 8..23 = bit 7</td></tr>
 <tr><td><code>zxt ra</code></td><td>1</td><td>Zero-extend byte: bits 8..23 = 0</td></tr>
-<tr><td><code>nop</code></td><td>1</td><td>No operation (encoded as <code>add r0, r0</code>)</td></tr>
+<tr><td><code>nop</code></td><td>1</td><td>No operation (0xFF)</td></tr>
 </table>
 
 <h4>Idioms</h4>

@@ -18,6 +18,16 @@
 - Backfill CHANGES.md with full project history (Feb 25 - Mar 16)
 - Comprehensive tutorial: docs/cor24-tutorial.md and web UI Tutorial dialog
   (registers, addressing modes, all instruction groups, I/O, interrupts, calling convention)
+- ISA Reference restyled with tables, CPU State, and Interrupts sections
+- Move Examples/Challenges to context-specific locations above editor/wizard
+- Program Editor fills available height
+- Fix wizard scroll with scrollIntoView for reliable header visibility
+
+## 2026-03-17
+
+- Fix nop: encode as 0xFF (matching reference as24), not add r0,r0
+  (old encoding had unwanted side effect of doubling r0)
+- Executor treats 0xFF as true no-op (advance PC, no register changes)
 
 ## 2026-03-15
 

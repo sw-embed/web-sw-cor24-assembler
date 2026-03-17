@@ -62,6 +62,13 @@ impl Executor {
             return ExecuteResult::Halted;
         }
 
+        // NOP: 0xFF is not in the decode ROM but is a valid no-op
+        if inst_byte == 0xFF {
+            cpu.pc = CpuState::mask_24(cpu.pc.wrapping_add(1));
+            cpu.instructions += 1;
+            return ExecuteResult::Ok;
+        }
+
         // Decode instruction
         let decoded_value = self.decode_rom.decode(inst_byte);
         if decoded_value == 0xFFF {
@@ -1980,12 +1987,29 @@ mod tests {
         let mut cpu = CpuState::new();
         let executor = Executor::new();
 
-        cpu.pc = 10; // Not at address 0, so 0x00 isn't halt
-        cpu.write_byte(10, 0xFF); // Invalid instruction
+        cpu.pc = 10;
+        cpu.write_byte(10, 0xD4); // Invalid (in 0xD3..0xFE range)
 
         let result = executor.step(&mut cpu);
 
         assert!(matches!(result, ExecuteResult::InvalidInstruction(_)));
+    }
+
+    #[test]
+    fn test_nop() {
+        let mut cpu = CpuState::new();
+        let executor = Executor::new();
+
+        cpu.pc = 10;
+        cpu.set_reg(0, 42);
+        cpu.write_byte(10, 0xFF); // nop
+
+        let result = executor.step(&mut cpu);
+
+        assert_eq!(result, ExecuteResult::Ok);
+        assert_eq!(cpu.pc, 11); // Advanced by 1 byte
+        assert_eq!(cpu.get_reg(0), 42); // r0 unchanged
+        assert_eq!(cpu.instructions, 1);
     }
 
     #[test]
