@@ -23,11 +23,9 @@ _putchr:
     mov     fp, sp
     la      r2, -65280
 .pc_wait:
-    lbu     r0, 1(r2)
-    lcu     r1, 128
-    and     r0, r1
-    ceq     r0, z
-    brf     .pc_wait
+    lb      r0, 1(r2)       ; read status (sign-extended)
+    cls     r0, z
+    brt     .pc_wait        ; spin while TX busy (bit 7 = negative)
     lb      r0, 9(fp)
     sb      r0, (r2)
     mov     sp, fp
