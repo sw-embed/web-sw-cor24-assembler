@@ -32,6 +32,10 @@
 - Add Literals example showing decimal, negative, and Intel hex formats
 - Simplify UART TX busy poll: cls r2,z / brt (3 instructions → 1)
   per Luther Johnson's feedback — lb sign-extends bit 7, so negative = busy
+- Apply cls/brt TX busy optimization to C pipeline examples (fib, sieve)
+- Rewrite Rust fibonacci_iter demo using @cor24 passthrough — 16 instructions
+  with zero spills (was ~35 with 14 spill ops per loop iteration)
+- Add translator optimization design doc (docs/translator-optimization.md)
 
 ## 2026-03-15
 

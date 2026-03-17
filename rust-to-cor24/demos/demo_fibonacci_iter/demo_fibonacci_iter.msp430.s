@@ -30,24 +30,24 @@ demo_fibonacci_iter:
 	.p2align	1
 	.type	fibonacci_iter,@function
 fibonacci_iter:
-	tst	r12
-	jeq	.LBB2_3
-	mov	#1, r15
-	mov	#1, r14
-.LBB2_2:
-	mov	r15, r11
-	add	r14, r11
-	add	#-1, r12
-	tst	r12
-	mov	r14, r13
-	mov	r14, r15
-	mov	r11, r14
-	jne	.LBB2_2
-	jmp	.LBB2_4
-.LBB2_3:
-	mov	#1, r13
-.LBB2_4:
-	mov	r13, r12
+	;APP
+	; @cor24: push    r1
+	; @cor24: lc      r1, 1
+	; @cor24: lc      r2, 1
+	; @cor24: ceq     r0, z
+	; @cor24: brt     .fib_done
+	; @cor24: .fib_loop:
+	; @cor24: push    r1
+	; @cor24: mov     r1, r2
+	; @cor24: pop     r2
+	; @cor24: add     r2, r1
+	; @cor24: add     r0, -1
+	; @cor24: ceq     r0, z
+	; @cor24: brf     .fib_loop
+	; @cor24: .fib_done:
+	; @cor24: mov     r0, r1
+	; @cor24: pop     r1
+	;NO_APP
 	ret
 .Lfunc_end2:
 	.size	fibonacci_iter, .Lfunc_end2-fibonacci_iter

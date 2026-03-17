@@ -1,30 +1,28 @@
-Assembled 90 bytes
+Assembled 64 bytes
 Running (speed: max IPS, time limit: 5s)...
 
 
-Executed 180 instructions
+Executed 98 instructions
 CPU halted (self-branch detected)
 
 === Registers ===
   PC:  0x00001E    C: 1
   r0:  0x000100  (     256)
-  r1:  0x000059  (      89)
+  r1:  0x00003F  (      63)
   r2:  0x000059  (      89)
   fp:  0xFEEC00
   sp:  0xFEEBFD
 
 === Emulator ===
-  Instructions: 180
+  Instructions: 99
   Halted: true
 
 === SRAM 000000-0FFFFF (1 MB) ===
-  000000: 65 29 53 00 00 26 13 FC 44 0A 7E 2B 20 00 00 D2  |e)S..&..D.~+ ...|
-  000010: 7A A6 18 29 00 01 00 7E 2B 4E 00 00 D2 7A 13 FC  |z..)...~+N...z..|
-  000020: C8 15 20 7D 44 01 A6 1B 79 46 01 7D 4D 1B A6 15  |.. }D...yF.}M...|
-  000030: 79 7D 4D 15 02 A6 15 79 09 FF C8 AE 18 AE 1B 55  |y}M....y.......U|
-  000040: 15 14 E6 13 04 7D 44 01 A6 18 79 4D 18 27 55 18  |.....}D...yM.'U.|
-  000050: 87 00 27 7E 2B 08 00 00 D2 7A 00 00 00 00 00 00  |..'~+....z......|
-  000060..0000FF: 160 bytes all zero
+  000000: 65 29 39 00 00 26 13 FC 44 0A 7E 2B 20 00 00 D2  |e)9..&..D.~+ ...|
+  000010: 7A A6 18 29 00 01 00 7E 2B 34 00 00 D2 7A 13 FC  |z..)...~+4...z..|
+  000020: 7E 45 01 46 01 C8 15 07 7E 5B 7B 07 09 FF C8 14  |~E.F....~[{.....|
+  000030: F5 56 7A 27 55 18 87 00 27 7E 2B 08 00 00 D2 7A  |.Vz'U...'~+....z|
+  000040..0000FF: 192 bytes all zero
   000100: 59 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  |Y...............|
   000110..0FFFFF: 1048304 bytes all zero
 
@@ -32,9 +30,9 @@ CPU halted (self-branch detected)
 
 === EBR FEE000-FEFFFF (8 KB, stack) ===
   FEE000..FEEBEF: 3056 bytes all zero
-  FEEBF0: 00 00 00 00 00 00 00 01 00 00 59 00 00 00 00 00  |..........Y.....|
+  FEEBF0: 00 00 00 00 37 00 00 10 00 00 3F 00 00 00 00 00  |....7.....?.....|
   FEEC00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  |................|
-  FEEC10: 00 00 00 00 00 90 00 00 59 00 00 59 00 00 00 00  |........Y..Y....|
+  FEEC10: 00 00 00 00 00 00 00 00 59 00 00 00 00 00 00 00  |........Y.......|
   FEEC20..FEFFFF: 5088 bytes all zero
 
 === I/O FF0000-FFFFFF (64 KB, memory-mapped peripherals) ===

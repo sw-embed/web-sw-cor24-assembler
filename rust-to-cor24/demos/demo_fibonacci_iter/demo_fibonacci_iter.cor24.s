@@ -33,37 +33,22 @@ demo_fibonacci_iter:
 
 ; --- function: fibonacci_iter ---
 fibonacci_iter:
-    ceq     r0, z
-    brt     .LBB2_3
-    push    r0
-    lc      r0, 1
-    sw      r0, 27(fp)
-    pop     r0
+    push    r1
+    lc      r1, 1
     lc      r2, 1
-.LBB2_2:
-    push    r0
-    lw      r0, 27(fp)
-    sw      r0, 21(fp)
-    pop     r0
-    push    r0
-    lw      r0, 21(fp)
-    add     r0, r2
-    sw      r0, 21(fp)
-    pop     r0
+    ceq     r0, z
+    brt     .fib_done
+.fib_loop:
+    push    r1
+    mov     r1, r2
+    pop     r2
+    add     r2, r1
     add     r0, -1
     ceq     r0, z
-    sw      r2, 24(fp)
-    sw      r2, 27(fp)
-    lw      r2, 21(fp)
-    brf     .LBB2_2
-    bra     .LBB2_4
-.LBB2_3:
-    push    r0
-    lc      r0, 1
-    sw      r0, 24(fp)
-    pop     r0
-.LBB2_4:
-    lw      r0, 24(fp)
+    brf     .fib_loop
+.fib_done:
+    mov     r0, r1
+    pop     r1
     jmp     (r1)
 .Lfunc_end2:
 
