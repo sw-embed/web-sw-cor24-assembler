@@ -54,6 +54,7 @@ pub fn app() -> Html {
     // State management
     let cpu = use_state(WasmCpu::new);
     let program_code = use_state(|| String::from(EXAMPLE_PROGRAM));
+    let asm_example_name = use_state(|| Some("Blink LED".to_string()));
     let assembly_output = use_state(|| None::<Html>);
     let assembly_lines = use_state(Vec::<String>::new);
     let asm_emu_state = use_state(EmulatorState::default);
@@ -735,6 +736,7 @@ pub fn app() -> Html {
                     step_enabled={*asm_assembled && !(*cpu).is_halted()}
                     run_enabled={*asm_assembled && !(*cpu).is_halted()}
                     show_exec_buttons={false}
+                    example_name={(*asm_example_name).clone()}
                 />
                 </div> // editor-column
 
@@ -949,8 +951,10 @@ pub fn app() -> Html {
                     let stop_flag = asm_stop_requested.borrow().clone();
                     let asm_load_gen = asm_load_gen.clone();
                     let asm_load_counter = asm_load_counter.borrow().clone();
+                    let asm_example_name = asm_example_name.clone();
                     Callback::from(move |idx: usize| {
-                        if let Some((_, _, code)) = examples.get(idx) {
+                        if let Some((name, _, code)) = examples.get(idx) {
+                            asm_example_name.set(Some(name.clone()));
                             // Stop any running animation loop
                             stop_flag.set(true);
                             asm_is_running.set(false);
@@ -1574,22 +1578,38 @@ fn run_one_instruction(
         }
     }
 
-    // Execute ONE instruction
-    let halted = if current_cpu.is_halted() {
-        true
-    } else {
-        current_cpu.step().is_err() || current_cpu.is_halted()
-    };
+    // Execute instructions based on speed setting.
+    // Slow (delay >= 10ms): 1 instruction per yield — fully visible stepping.
+    // Fast (delay < 10ms): batch (delay+1)^2 instructions per yield — usable
+    // for programs with delay loops. State updates after each batch.
+    let delay = speed_handle.get();
+    let batch = if delay >= 10 { 1 } else { (delay + 1) * (delay + 1) };
 
-    // Update full state every instruction (educational visualization)
+    let mut halted = false;
+    for _ in 0..batch {
+        if current_cpu.is_halted() {
+            halted = true;
+            break;
+        }
+        if current_cpu.step().is_err() {
+            halted = true;
+            break;
+        }
+        if current_cpu.is_halted() {
+            halted = true;
+            break;
+        }
+    }
+
+    // Update full state after batch (educational visualization)
     state_handle.set(capture_cpu_state(&current_cpu, &state_handle));
     cpu_handle.set(current_cpu.clone());
 
     if halted {
         running_handle.set(false);
     } else {
-        let delay = speed_handle.get();
-        gloo::timers::callback::Timeout::new(delay, move || {
+        let yield_delay = delay.max(1);
+        gloo::timers::callback::Timeout::new(yield_delay, move || {
             run_one_instruction(current_cpu, cpu_handle, running_handle, state_handle, stop_handle, switch_handle, uart_handle, uart_clear_handle, speed_handle);
         }).forget();
     }

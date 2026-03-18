@@ -114,6 +114,11 @@ h1 {
     flex-shrink: 0;
 }
 
+.panel-title-example {
+    color: #ffd700;
+    font-style: italic;
+}
+
 /* Button Styles */
 button {
     background: #00d9ff;

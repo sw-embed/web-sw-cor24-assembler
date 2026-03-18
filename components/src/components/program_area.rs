@@ -20,6 +20,9 @@ pub struct ProgramAreaProps {
     /// Hide Step/Run/Reset buttons when DebugPanel provides them (default: true)
     #[prop_or(true)]
     pub show_exec_buttons: bool,
+    /// Current example name to show in the heading
+    #[prop_or_default]
+    pub example_name: Option<String>,
 }
 
 #[function_component(ProgramArea)]
@@ -94,7 +97,12 @@ pub fn program_area(props: &ProgramAreaProps) -> Html {
 
     html! {
         <div class="program-area">
-            <div class="panel-title">{"Program Editor"}</div>
+            <div class="panel-title">
+                {"Program Editor"}
+                if let Some(name) = &props.example_name {
+                    <span class="panel-title-example">{format!(" — {}", name)}</span>
+                }
+            </div>
 
             // Source editor (top half)
             <textarea
