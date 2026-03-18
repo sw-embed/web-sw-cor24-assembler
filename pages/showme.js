@@ -36,7 +36,7 @@
             padding: 6px 14px; border-radius: 6px;
             pointer-events: none; opacity: 0;
             transition: opacity 0.3s ease-in-out;
-            top: 10px; left: 50%; transform: translateX(-50%);
+            top: 10px; left: 200px;
             font-family: sans-serif; font-weight: bold;
         `;
         document.body.appendChild(label);
