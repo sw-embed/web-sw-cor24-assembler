@@ -2455,3 +2455,76 @@ header h1 {
     background: #555;
     cursor: not-allowed;
 }
+
+/* Self-test panel */
+.selftest-panel {
+    margin: 12px;
+    border: 2px solid #3d2e6b;
+    border-radius: 8px;
+    background: #1a1a2e;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.selftest-summary {
+    padding: 10px 16px;
+    font-weight: bold;
+    font-size: 1.1em;
+    border-bottom: 1px solid #3d2e6b;
+}
+
+.selftest-pass {
+    color: #4ade80;
+    background: #0a2a1a;
+}
+
+.selftest-fail {
+    color: #f87171;
+    background: #2a0a0a;
+}
+
+.selftest-blink {
+    animation: selftest-blink-anim 0.5s ease-in-out infinite;
+}
+
+@keyframes selftest-blink-anim {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+.selftest-results {
+    padding: 4px 0;
+}
+
+.selftest-row {
+    display: flex;
+    gap: 10px;
+    padding: 4px 16px;
+    align-items: baseline;
+    font-size: 0.9em;
+}
+
+.selftest-row-pass {
+    color: #a7f3d0;
+}
+
+.selftest-row-fail {
+    color: #fca5a5;
+    background: #1a0505;
+}
+
+.selftest-icon {
+    flex-shrink: 0;
+    width: 20px;
+}
+
+.selftest-name {
+    font-weight: bold;
+    min-width: 120px;
+}
+
+.selftest-detail {
+    color: #888;
+    font-family: 'Monaco', monospace;
+    font-size: 0.85em;
+}

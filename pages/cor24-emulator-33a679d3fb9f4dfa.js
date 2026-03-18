@@ -323,14 +323,16 @@ export function init() {
 }
 
 /**
- * Run self-tests on all assembler examples. Returns JSON array of results.
+ * Run self-tests on all assembler examples.
+ * If inject_failure is true, forces the first passing test to fail (test-the-test).
+ * @param {boolean} inject_failure
  * @returns {string}
  */
-export function run_self_tests() {
+export function run_self_tests(inject_failure) {
     let deferred1_0;
     let deferred1_1;
     try {
-        const ret = wasm.run_self_tests();
+        const ret = wasm.run_self_tests(inject_failure);
         deferred1_0 = ret[0];
         deferred1_1 = ret[1];
         return getStringFromWasm0(ret[0], ret[1]);

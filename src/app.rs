@@ -15,17 +15,19 @@ use crate::wasm::{WasmCpu, validate_challenge};
 
 #[function_component(App)]
 pub fn app() -> Html {
-    // Self-test mode: activated by ?selftest in URL
+    // Self-test mode: ?selftest or ?selftestbad in URL
     let selftest_results = use_state(|| None::<String>);
     {
         let selftest_results = selftest_results.clone();
         use_effect_with((), move |_| {
             if let Some(window) = web_sys::window()
                 && let Ok(search) = window.location().search()
-                && search.contains("selftest")
             {
-                let json = crate::wasm::run_self_tests();
-                selftest_results.set(Some(json));
+                if search.contains("selftestbad") {
+                    selftest_results.set(Some(crate::wasm::run_self_tests(true)));
+                } else if search.contains("selftest") {
+                    selftest_results.set(Some(crate::wasm::run_self_tests(false)));
+                }
             }
             || ()
         });
@@ -1062,10 +1064,7 @@ pub fn app() -> Html {
 
             // Self-test results panel (only shown when ?selftest is in URL)
             if let Some(json) = &*selftest_results {
-                <div class="selftest-panel">
-                    <h3>{"Self-Test Results"}</h3>
-                    <pre class="selftest-results">{json}</pre>
-                </div>
+                {render_selftest_panel(json)}
             }
 
             // Footer
@@ -1718,6 +1717,69 @@ fn make_uart_clear_callback(
             cpu.set(new_cpu);
         }
     })
+}
+
+/// Render the self-test results panel
+fn render_selftest_panel(json: &str) -> Html {
+    let results = parse_selftest_json(json);
+    let total = results.len();
+    let passed = results.iter().filter(|r| r.0).count();
+    let failed = total - passed;
+    let all_pass = failed == 0;
+    let summary_class = if all_pass { "selftest-summary selftest-pass" } else { "selftest-summary selftest-fail" };
+
+    html! {
+        <div class="selftest-panel">
+            <div class={summary_class}>
+                if !all_pass {
+                    <span class="selftest-blink">{"\u{274C} "}</span>
+                } else {
+                    <span>{"\u{2705} "}</span>
+                }
+                <span>{format!("Self-Test: {} tests, {} passed, {} failed", total, passed, failed)}</span>
+            </div>
+            <div class="selftest-results">
+                {for results.iter().map(|(pass, name, detail)| {
+                    let class = if *pass { "selftest-row selftest-row-pass" } else { "selftest-row selftest-row-fail" };
+                    let icon = if *pass { "\u{2705}" } else { "\u{274C}" };
+                    html! {
+                        <div class={class}>
+                            <span class="selftest-icon">{icon}</span>
+                            <span class="selftest-name">{name}</span>
+                            <span class="selftest-detail">{detail}</span>
+                        </div>
+                    }
+                })}
+            </div>
+        </div>
+    }
+}
+
+/// Parse self-test JSON into (pass, name, detail) tuples
+fn parse_selftest_json(json: &str) -> Vec<(bool, String, String)> {
+    let mut results = Vec::new();
+    // Simple JSON array parser — each element: {"name":"...","pass":true/false,"detail":"..."}
+    for entry in json.split("},{") {
+        let entry = entry.trim_start_matches('[').trim_start_matches('{')
+            .trim_end_matches(']').trim_end_matches('}');
+        let mut name = String::new();
+        let mut pass = false;
+        let mut detail = String::new();
+        for part in entry.split(',') {
+            let part = part.trim();
+            if let Some(v) = part.strip_prefix("\"name\":\"") {
+                name = v.trim_end_matches('"').to_string();
+            } else if let Some(v) = part.strip_prefix("\"pass\":") {
+                pass = v == "true";
+            } else if let Some(v) = part.strip_prefix("\"detail\":\"") {
+                detail = v.trim_end_matches('"').to_string();
+            }
+        }
+        if !name.is_empty() {
+            results.push((pass, name, detail));
+        }
+    }
+    results
 }
 
 /// Capture current CPU state into an EmulatorState, preserving previous state for heatmap
