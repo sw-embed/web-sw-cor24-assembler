@@ -10,7 +10,7 @@
         // Create cursor overlay
         const cursor = document.createElement('div');
         cursor.id = 'showme-cursor';
-        cursor.innerHTML = '🖱️';
+        cursor.innerHTML = '👆';
         cursor.style.cssText = `
             position: fixed; z-index: 99999; font-size: 32px;
             pointer-events: none; transition: all 0.6s ease-in-out;
@@ -36,11 +36,11 @@
         const steps = [
             { desc: 'Click Assembler tab', sel: '.tab-bar .tab:first-child', delay: 1500 },
             { desc: 'Open Examples', sel: '.editor-toolbar .toolbar-btn:first-child', delay: 1500 },
-            { desc: 'Select Fibonacci example', sel: '.example-item:nth-child(8)', delay: 2000 },
+            { desc: 'Select Blink LED', sel: '.example-item:nth-child(3)', delay: 2000 },
             { desc: 'Click Assemble', sel: '#assembleBtn', delay: 2000 },
             { desc: 'Click Run', sel: '.run-btn', delay: 2000 },
-            { desc: 'Watch it execute...', sel: null, delay: 4000 },
-            { desc: 'Click Stop', sel: '.stop-btn', delay: 1000 },
+            { desc: 'Watch the LED blink...', sel: null, delay: 4000 },
+            { desc: 'Click Stop', sel: '.stop-btn', delay: 1500 },
             { desc: 'Expand Instruction Trace', sel: '.trace-header', delay: 2000 },
             { desc: 'Click Step to single-step', sel: '.step-btn', delay: 1500 },
             { desc: 'Step again', sel: '.step-btn', delay: 1500 },
