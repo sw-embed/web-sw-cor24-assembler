@@ -335,14 +335,7 @@ pub fn validate_challenge(challenge_id: usize, source: &str) -> Result<bool, JsV
 /// If inject_failure is true, forces the first passing test to fail (test-the-test).
 #[wasm_bindgen]
 pub fn run_self_tests(inject_failure: bool) -> String {
-    let mut results = crate::challenge::run_self_tests();
-    if inject_failure {
-        // Flip the first passing test to a failure
-        if let Some(r) = results.iter_mut().find(|r| r.pass) {
-            r.pass = false;
-            r.detail = format!("INJECTED FAILURE (was: {})", r.detail);
-        }
-    }
+    let results = crate::challenge::run_self_tests(inject_failure);
     let json: Vec<String> = results.iter().map(|r| {
         format!(r#"{{"name":"{}","pass":{},"detail":"{}"}}"#,
             r.name, r.pass, r.detail.replace('"', "'"))
