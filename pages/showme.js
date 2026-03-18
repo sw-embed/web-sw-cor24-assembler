@@ -4,10 +4,12 @@
     const search = window.location.search;
     if (!search.includes('showme')) return;
 
-    // Determine which tour to run
+    // Determine which tour to run (check longest match first)
     const mode = search.includes('showme-rust') ? 'rust'
+               : search.includes('showme-asm') ? 'asm'
                : search.includes('showme-c') ? 'c'
-               : 'asm';
+               : null;
+    if (!mode) return;
 
     // Wait for app to render
     setTimeout(() => startShowMe(mode), 2000);
@@ -42,34 +44,34 @@
         const steps = mode === 'rust' ? [
             { desc: 'Click Rust tab', sel: '.tab-bar .tab:nth-child(3)', delay: 1500 },
             { desc: 'Open Examples', sel: '.wizard-header-btn .toolbar-btn', delay: 1500 },
-            { desc: 'Select Blink LED', sel: '.example-item:nth-child(1)', delay: 2000 },
-            { desc: 'Click Compile', sel: '.wizard-action-btn', delay: 2000, js: true },
-            { desc: 'Click Translate', sel: '.wizard-action-btn', delay: 2000, js: true },
-            { desc: 'Click Assemble', sel: '.wizard-action-btn', delay: 2000, js: true },
-            { desc: 'Click Run', sel: '.run-btn', delay: 2000, js: true },
+            { desc: 'Select Blink LED', sel: '#rust-examples .example-item:nth-child(1)', delay: 2000 },
+            { desc: 'Click Compile', sel: '.wizard-action-btn', delay: 2000 },
+            { desc: 'Click Translate', sel: '.wizard-action-btn', delay: 2000 },
+            { desc: 'Click Assemble', sel: '.wizard-action-btn', delay: 2000 },
+            { desc: 'Click Run', sel: '.run-btn', delay: 2000 },
             { desc: 'Watch the LED blink...', sel: null, delay: 4000 },
-            { desc: 'Click Stop', sel: '.stop-btn', delay: 1500, js: true },
+            { desc: 'Click Stop', sel: '.stop-btn', delay: 1500 },
             { desc: 'Expand Instruction Trace', sel: '.trace-header', delay: 2000 },
-            { desc: 'Click Step', sel: '.step-btn', delay: 1500, js: true },
-            { desc: 'Step again', sel: '.step-btn', delay: 1500, js: true },
+            { desc: 'Click Step', sel: '.step-btn', delay: 1500 },
+            { desc: 'Step again', sel: '.step-btn', delay: 1500 },
             { desc: 'Tour complete!', sel: null, delay: 3000 },
         ] : mode === 'c' ? [
             { desc: 'Click C tab', sel: '.tab-bar .tab:nth-child(2)', delay: 1500 },
             { desc: 'Open Examples', sel: '.wizard-header-btn .toolbar-btn', delay: 1500 },
-            { desc: 'Select Sieve', sel: '.example-item:nth-child(2)', delay: 2000 },
-            { desc: 'Click Compile', sel: '.wizard-action-btn', delay: 2000, js: true },
-            { desc: 'Click Assemble', sel: '.wizard-action-btn', delay: 2000, js: true },
-            { desc: 'Click Run', sel: '.run-btn', delay: 2000, js: true },
+            { desc: 'Select Sieve', sel: '#c-examples .example-item:nth-child(2)', delay: 2000 },
+            { desc: 'Click Compile', sel: '.wizard-action-btn', delay: 2000 },
+            { desc: 'Click Assemble', sel: '.wizard-action-btn', delay: 2000 },
+            { desc: 'Click Run', sel: '.run-btn', delay: 2000 },
             { desc: 'Watch Sieve of Eratosthenes...', sel: null, delay: 5000 },
-            { desc: 'Click Stop', sel: '.stop-btn', delay: 1500, js: true },
+            { desc: 'Click Stop', sel: '.stop-btn', delay: 1500 },
             { desc: 'Expand Instruction Trace', sel: '.trace-header', delay: 2000 },
-            { desc: 'Click Step', sel: '.step-btn', delay: 1500, js: true },
-            { desc: 'Step again', sel: '.step-btn', delay: 1500, js: true },
+            { desc: 'Click Step', sel: '.step-btn', delay: 1500 },
+            { desc: 'Step again', sel: '.step-btn', delay: 1500 },
             { desc: 'Tour complete!', sel: null, delay: 3000 },
         ] : [
             { desc: 'Click Assembler tab', sel: '.tab-bar .tab:first-child', delay: 1500 },
             { desc: 'Open Examples', sel: '.editor-toolbar .toolbar-btn:first-child', delay: 1500 },
-            { desc: 'Select Blink LED', sel: '.example-item:nth-child(3)', delay: 2000 },
+            { desc: 'Select Blink LED', sel: '#asm-examples .example-item:nth-child(3)', delay: 2000 },
             { desc: 'Click Assemble', sel: '#assembleBtn', delay: 2000 },
             { desc: 'Click Run', sel: '.run-btn', delay: 2000 },
             { desc: 'Watch the LED blink...', sel: null, delay: 4000 },
