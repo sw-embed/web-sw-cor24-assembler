@@ -91,20 +91,65 @@ cor24-dbg --entry 0x93 program.lgo
 ## msp430-to-cor24 — Translator
 
 Translates MSP430 assembly (from `rustc`) to COR24 assembly. This is
-a source-to-source translator (`.msp430.s` → `.cor24.s`), not a compiler.
+a source-to-source translator — `.msp430.s` text in, `.cor24.s` text out.
+No binary files are involved.
+
+### Direct translation (two files)
 
 ```bash
-# Translate MSP430 assembly to COR24 assembly
-msp430-to-cor24 --entry start input.msp430.s -o output.cor24.s
+# Step 1: Translate MSP430 .s → COR24 .s (writes output to file)
+msp430-to-cor24 demo.msp430.s -o demo.cor24.s --entry start
 
-# Full pipeline from Rust source
+# Step 2: Assemble + run the COR24 .s file
+cor24-run --run demo.cor24.s --dump
+```
+
+The translator reads the MSP430 `.s` file, writes a COR24 `.s` file.
+The `--entry` flag specifies which function is the entry point (default:
+`start`). The translator generates a reset vector that jumps to it.
+
+Without `-o`, the COR24 assembly is printed to stdout.
+
+### Compile mode (from Rust source)
+
+```bash
+# One command: compile Rust → MSP430 → COR24 (prints to stdout)
+msp430-to-cor24 --compile ./my-project --entry start
+```
+
+This runs `rustc --target msp430-none-elf --emit asm` inside the
+project directory, finds the generated `.s` file in `target/`, and
+translates it to COR24 assembly.
+
+### Full pipeline step by step
+
+```bash
+# Step 1: Rust → MSP430 assembly
+cd rust-to-cor24/demos/demo_fibonacci
 rustup run nightly cargo rustc \
     --target msp430-none-elf \
     -Z build-std=core --release \
     -- --emit asm
 
-msp430-to-cor24 --entry start target/.../demo.s -o demo.cor24.s
-cor24-run --run demo.cor24.s --dump
+# The .s file lands in target/msp430-none-elf/release/deps/*.s
+cp target/msp430-none-elf/release/deps/*.s demo_fibonacci.msp430.s
+
+# Step 2: MSP430 → COR24 assembly (text file to text file)
+msp430-to-cor24 demo_fibonacci.msp430.s -o demo_fibonacci.cor24.s
+
+# Step 3: Assemble COR24 .s + run in emulator
+cor24-run --run demo_fibonacci.cor24.s --dump --trace 50
+```
+
+### Intermediate files
+
+All intermediate files are human-readable text:
+
+```
+src/lib.rs                    ← Rust source (you write this)
+demo_fibonacci.msp430.s       ← MSP430 assembly (rustc produces this)
+demo_fibonacci.cor24.s        ← COR24 assembly (translator produces this)
+                              ← No binary file — cor24-run assembles in memory
 ```
 
 ### What the translator does
@@ -123,6 +168,15 @@ Pre-built demos in `rust-to-cor24/demos/`:
 cd rust-to-cor24/demos
 bash generate-all.sh        # Compile + translate + run all 13 demos
 bash demo_fibonacci/run.sh  # Run one specific demo
+```
+
+Each demo directory contains all intermediate files after running:
+```
+demo_fibonacci/
+    src/lib.rs                    ← Rust source
+    demo_fibonacci.msp430.s       ← MSP430 assembly from rustc
+    demo_fibonacci.cor24.s        ← COR24 assembly from translator
+    demo_fibonacci.log            ← Emulator output (registers, memory)
 ```
 
 ## File Formats
