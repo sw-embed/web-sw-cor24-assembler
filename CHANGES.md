@@ -1,5 +1,15 @@
 # Changes
 
+## 2026-03-19
+
+- Apply Luther's assembly idiom feedback: add r0,-1 replaces lc+sub
+  in countdown, fibonacci, multiply (saves 1-3 instructions each)
+- Echo example: add TX busy poll (cls/brt) before all UART writes
+- Feedback checklist: docs/feedback-checklist.md tracks all items
+- ?showme-asm, ?showme-c, ?showme-rust animated tour modes
+- Fix stale run loop: generation counter kills old setTimeout chains
+- Stop emulator on example load and tab switch
+
 ## 2026-03-18
 
 - Self-test mode: ?selftest runs all 15 examples, ?selftestbad uses wrong
