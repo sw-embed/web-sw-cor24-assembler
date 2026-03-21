@@ -319,17 +319,15 @@ fn check_expected(name: &str, cpu: &CpuState, inject_bad: bool) -> SelfTestResul
             checks.push(("UART", format!("{:?}", expected), format!("{:?}", &cpu.io.uart_output), cpu.io.uart_output == expected));
         }
         "Variables" => {
-            // "Hello" copied to SRAM at address 256
-            let expect_h: u8 = if inject_bad { 0 } else { 72 };
-            let v0 = cpu.read_byte(256);
-            let v1 = cpu.read_byte(257);
-            let v2 = cpu.read_byte(258);
-            let v3 = cpu.read_byte(259);
-            let v4 = cpu.read_byte(260);
+            // "Hello World!" copied to SRAM at addresses 256 and 512
+            let expected = if inject_bad { "WRONG" } else { "Hello World!" };
+            let copy1: Vec<u8> = (0..12).map(|i| cpu.read_byte(256 + i)).collect();
+            let copy2: Vec<u8> = (0..12).map(|i| cpu.read_byte(512 + i)).collect();
+            let actual1 = String::from_utf8_lossy(&copy1).to_string();
+            let actual2 = String::from_utf8_lossy(&copy2).to_string();
             checks.push(("halted", format!("{}", expect_halt), format!("{}", cpu.halted), cpu.halted == expect_halt));
-            checks.push(("mem[256..260]", format!("{}", if inject_bad { "WRONG" } else { "Hello" }),
-                format!("{}", String::from_utf8_lossy(&[v0, v1, v2, v3, v4])),
-                v0 == expect_h && v1 == 101 && v2 == 108 && v3 == 108 && v4 == 111));
+            checks.push(("mem[256]", expected.to_string(), actual1.clone(), actual1 == expected));
+            checks.push(("mem[512]", expected.to_string(), actual2.clone(), actual2 == expected));
         }
         _ => {
             checks.push(("defined", "true".into(), "false".into(), false));
