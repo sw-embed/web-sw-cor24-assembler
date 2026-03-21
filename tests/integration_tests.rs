@@ -187,7 +187,7 @@ fn test_all_examples_halt() {
 /// Self-branch halt detection works via single-step
 #[test]
 fn test_self_branch_halt_via_step() {
-    let cpu = assemble_and_run("lc r0,1\nhalt: bra halt", 100);
+    let cpu = assemble_and_run("lc r0,1\nhalt:\nbra halt", 100);
     assert!(cpu.halted, "Self-branch should be detected as halt");
     assert_eq!(cpu.pc, 0x0002, "PC should point at the bra instruction");
 }
@@ -195,7 +195,7 @@ fn test_self_branch_halt_via_step() {
 /// Step past halt: stepping a halted CPU should not change state
 #[test]
 fn test_step_halted_cpu_is_noop() {
-    let mut cpu = assemble_and_run("halt: bra halt", 100);
+    let mut cpu = assemble_and_run("halt:\nbra halt", 100);
     assert!(cpu.halted);
     let pc_before = cpu.pc;
     let cycles_before = cpu.cycles;
@@ -305,7 +305,7 @@ fn test_interrupt_example() {
 /// Echo example: letters→uppercase, !→halt, others echo as-is
 #[test]
 fn test_echo_example() {
-    let source = include_str!("../docs/examples/echo.s");
+    let source = include_str!("../src/examples/assembler/echo.s");
     let mut assembler = Assembler::new();
     let result = assembler.assemble(source);
     assert!(result.errors.is_empty(), "Echo assembly errors: {:?}", result.errors);
@@ -383,17 +383,20 @@ fn test_uart_with_poll_all_characters() {
     let source = r#"
         la      r1,-65280
         lc      r0,65
-.w1:    lb      r2,1(r1)
+.w1:
+        lb      r2,1(r1)
         cls     r2,z
         brt     .w1
         sb      r0,0(r1)
         lc      r0,66
-.w2:    lb      r2,1(r1)
+.w2:
+        lb      r2,1(r1)
         cls     r2,z
         brt     .w2
         sb      r0,0(r1)
         lc      r0,67
-.w3:    lb      r2,1(r1)
+.w3:
+        lb      r2,1(r1)
         cls     r2,z
         brt     .w3
         sb      r0,0(r1)
@@ -420,7 +423,8 @@ halt:
 fn test_uart_never_ready_hangs_polling_program() {
     let source = r#"
         la      r1,-65280
-.wait:  lb      r2,1(r1)
+.wait:
+        lb      r2,1(r1)
         cls     r2,z
         brt     .wait
         lc      r0,65

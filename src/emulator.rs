@@ -678,7 +678,7 @@ mod tests {
     fn test_echo_via_single_step_loop() {
         use crate::assembler::Assembler;
 
-        let source = include_str!("../docs/examples/echo.s");
+        let source = include_str!("examples/assembler/echo.s");
         let mut asm = Assembler::new();
         let result = asm.assemble(source);
         assert!(result.errors.is_empty(), "{:?}", result.errors);

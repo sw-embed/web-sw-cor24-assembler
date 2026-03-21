@@ -114,15 +114,12 @@ impl Assembler {
         let line = line.trim();
 
         // Skip empty lines and comments
-        if line.is_empty() || line.starts_with(';') || line.starts_with('#') {
+        if line.is_empty() || line.starts_with(';') {
             return;
         }
 
-        // Strip trailing comments before any parsing (colons in comments
-        // would otherwise be misidentified as label separators)
+        // Strip trailing comments (semicolon only, matching reference as24)
         let line = if let Some(pos) = line.find(';') {
-            line[..pos].trim()
-        } else if let Some(pos) = line.find('#') {
             line[..pos].trim()
         } else {
             line
@@ -136,7 +133,7 @@ impl Assembler {
         let mut label = None;
         let mut instruction_part = line;
 
-        // Check for label
+        // Check for label (must be on its own line, matching reference as24)
         if let Some(colon_pos) = line.find(':') {
             let label_str = line[..colon_pos].trim();
             if !label_str.is_empty() {
@@ -144,6 +141,13 @@ impl Assembler {
                 self.labels.insert(label_str.to_string(), self.address);
             }
             instruction_part = line[colon_pos + 1..].trim();
+            if !instruction_part.is_empty() {
+                self.errors.push(format!(
+                    "Line {}: label must be on its own line (as24 compatible)",
+                    line_num + 1
+                ));
+                return;
+            }
         }
 
         // Handle directives
@@ -210,7 +214,7 @@ impl Assembler {
                     self.address = addr;
                 }
             }
-            ".byte" | ".db" => {
+            ".byte" => {
                 for part in &parts[1..] {
                     if let Some(val) = self.parse_number(part.trim_matches(',')) {
                         self.output.push(val as u8);
@@ -218,7 +222,7 @@ impl Assembler {
                     }
                 }
             }
-            ".word" | ".dw" => {
+            ".word" => {
                 for part in &parts[1..] {
                     if let Some(val) = self.parse_number(part.trim_matches(',')) {
                         // 24-bit word, little-endian
@@ -229,23 +233,7 @@ impl Assembler {
                     }
                 }
             }
-            ".ascii" | ".asciz" => {
-                // Extract string between quotes
-                if let Some(start) = directive.find('"')
-                    && let Some(end) = directive.rfind('"')
-                    && end > start
-                {
-                    let s = &directive[start + 1..end];
-                    for c in s.bytes() {
-                        self.output.push(c);
-                        self.address += 1;
-                    }
-                    if parts[0].to_lowercase() == ".asciz" {
-                        self.output.push(0);
-                        self.address += 1;
-                    }
-                }
-            }
+            // .ascii and .asciz not supported by reference as24
             ".comm" => {
                 // BSS allocation: .comm symbol, size
                 // Defines label at current address and advances by size
@@ -375,10 +363,7 @@ impl Assembler {
 
     fn parse_number(&self, s: &str) -> Option<u32> {
         let s = s.trim();
-        if s.starts_with("0x") || s.starts_with("0X") {
-            // C-style hex: 0xFF
-            u32::from_str_radix(&s[2..], 16).ok()
-        } else if (s.ends_with('h') || s.ends_with('H'))
+        if (s.ends_with('h') || s.ends_with('H'))
             && s.len() > 1
             && s.as_bytes()[0].is_ascii_hexdigit()
         {
@@ -1087,7 +1072,7 @@ mod tests {
     #[test]
     fn test_la() {
         let mut asm = Assembler::new();
-        let result = asm.assemble("la r0,0x1234");
+        let result = asm.assemble("la r0,1234h");
         assert!(result.errors.is_empty(), "Errors: {:?}", result.errors);
         assert_eq!(result.bytes, vec![0x29, 0x34, 0x12, 0x00]);
     }
@@ -1114,8 +1099,8 @@ mod tests {
 
         // Minimal LED blink test: load LED address, write value, halt
         let code = r#"
-            la      r0, 0xFF0000    ; LED I/O address
-            lc      r1, 0x55        ; Value to write
+            la      r0, -65536      ; LED I/O address
+            lc      r1, 85          ; Value to write
             sb      r1, 0(r0)       ; Write to LEDs
         "#;
 
@@ -1135,7 +1120,7 @@ mod tests {
         }
 
         // Check LED value
-        assert_eq!(cpu.io.leds, 0x55, "LED value should be 0x55, got 0x{:02X}", cpu.io.leds);
+        assert_eq!(cpu.io.leds, 85, "LED value should be 85, got {}", cpu.io.leds);
     }
 
     #[test]
@@ -1146,7 +1131,7 @@ mod tests {
         // addr 2: add r0,r0  (1 byte)
         // addr 3: bra loop   (2 bytes) -> offset = 2 - (3+4) = -5
         let mut asm = Assembler::new();
-        let result = asm.assemble("lc r0,5\nloop: add r0,r0\nbra loop");
+        let result = asm.assemble("lc r0,5\nloop:\nadd r0,r0\nbra loop");
         assert!(result.errors.is_empty(), "Errors: {:?}", result.errors);
         assert_eq!(result.bytes[3], 0x13); // bra
         assert_eq!(result.bytes[4] as i8, -5); // offset = 2 - 7 = -5
@@ -1160,7 +1145,7 @@ mod tests {
         // addr 3: skip:
         // addr 3: lc r0,1    (2 bytes)
         let mut asm = Assembler::new();
-        let result = asm.assemble("bra skip\nadd r0,r0\nskip: lc r0,1");
+        let result = asm.assemble("bra skip\nadd r0,r0\nskip:\nlc r0,1");
         assert!(result.errors.is_empty(), "Errors: {:?}", result.errors);
         assert_eq!(result.bytes[0], 0x13); // bra
         assert_eq!(result.bytes[1] as i8, -1); // offset = 3 - 4 = -1
@@ -1176,7 +1161,7 @@ mod tests {
         //   add r0,-1        ; r0 -= 1  (add imm with sign-extended 0xFF = -1)
         //   ceq r0,z         ; compare r0 to zero
         //   brf loop         ; if not equal, loop
-        let code = "lc r0,3\nloop: add r0,0xFF\nceq r0,z\nbrf loop";
+        let code = "lc r0,3\nloop:\nadd r0,-1\nceq r0,z\nbrf loop";
         let mut asm = Assembler::new();
         let result = asm.assemble(code);
         assert!(result.errors.is_empty(), "Assembly errors: {:?}", result.errors);
@@ -1198,7 +1183,7 @@ mod tests {
         let code = r#"; Example 10: Button Echo
 ; LED D2 lights when button S2 is pressed
 
-        la      r1,0xFF0000 ; I/O address (LEDSWDAT)
+        la      r1,-65536   ; I/O address (LEDSWDAT)
         lc      r2,1        ; Bit mask for XOR
 
 loop:
@@ -1208,7 +1193,8 @@ loop:
 
         bra     loop        ; Keep polling
 
-halt:   bra     halt        ; Never reached
+halt:
+        bra     halt        ; Never reached
 "#;
         let mut asm = Assembler::new();
         let result = asm.assemble(code);
