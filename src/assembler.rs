@@ -1215,4 +1215,66 @@ halt:   bra     halt        ; Never reached
         assert!(result.errors.is_empty(), "Assembly errors: {:?}", result.errors);
         assert!(!result.bytes.is_empty(), "Should produce bytes");
     }
+
+    #[test]
+    fn test_reject_numeric_register_aliases() {
+        // r3-r9 are not valid register names.
+        // Only r0, r1, r2, fp, sp, z, iv, ir are allowed.
+        let invalid_registers = ["r3", "r4", "r5", "r6", "r7", "r8", "r9"];
+        for reg in &invalid_registers {
+            let mut asm = Assembler::new();
+            let code = format!("lc {},42", reg);
+            let result = asm.assemble(&code);
+            assert!(
+                !result.errors.is_empty(),
+                "{} should be rejected but was accepted: {:?}", reg, result.bytes
+            );
+        }
+    }
+
+    #[test]
+    fn test_reject_numeric_registers_in_all_positions() {
+        // Test r3-r7 in source (rb) position too
+        for reg in &["r3", "r4", "r5", "r6", "r7"] {
+            let mut asm = Assembler::new();
+            let code = format!("add r0,{}", reg);
+            let result = asm.assemble(&code);
+            assert!(
+                !result.errors.is_empty(),
+                "{} as source operand should be rejected", reg
+            );
+        }
+        // Test in memory base register position
+        for reg in &["r3", "r4", "r5", "r6", "r7"] {
+            let mut asm = Assembler::new();
+            let code = format!("lb r0,0({})", reg);
+            let result = asm.assemble(&code);
+            assert!(
+                !result.errors.is_empty(),
+                "{} as base register should be rejected", reg
+            );
+        }
+    }
+
+    #[test]
+    fn test_named_registers_accepted() {
+        // fp, sp, z, iv, ir should all be accepted in appropriate contexts
+        let valid_cases = [
+            "push fp",
+            "pop fp",
+            "mov fp,sp",
+            "mov sp,fp",
+            "ceq r0,z",
+            "mov iv,r0",
+            "jmp (ir)",
+        ];
+        for code in &valid_cases {
+            let mut asm = Assembler::new();
+            let result = asm.assemble(code);
+            assert!(
+                result.errors.is_empty(),
+                "'{}' should be accepted but got errors: {:?}", code, result.errors
+            );
+        }
+    }
 }
