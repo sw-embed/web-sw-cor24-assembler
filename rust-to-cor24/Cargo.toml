@@ -11,6 +11,7 @@ exclude = ["examples/blink", "demos/demo_echo"]
 wasmparser = "0.121"
 anyhow = "1.0"
 cor24-emulator = { path = ".." }
+libc = "0.2"
 
 [[bin]]
 name = "wasm2cor24"

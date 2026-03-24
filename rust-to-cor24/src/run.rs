@@ -8,6 +8,7 @@
 
 use cor24_emulator::assembler::Assembler;
 use cor24_emulator::emulator::EmulatorCore;
+use std::collections::VecDeque;
 use std::env;
 use std::fs;
 use std::io::Write;
@@ -92,18 +93,23 @@ fn run_with_timing(emu: &mut EmulatorCore, speed: u64, time_limit: f64, max_inst
             prev_uart_len = output.len();
         }
 
-        // Feed next UART input character if available
+        // Feed next UART input character when previous was consumed (FIFO drain)
+        // Only send when RX ready bit (bit 0 of status register) is clear,
+        // meaning the program has read the previous byte.
         if uart_input_pos < uart_input.len() {
-            let ch = uart_input[uart_input_pos];
-            emu.send_uart_byte(ch);
-            if ch == b'!' {
-                println!("[UART RX] '!'  (0x21) — halt signal");
-            } else if ch == b'\n' {
-                println!("[UART RX] '\\n'");
-            } else {
-                println!("[UART RX] '{}'  (0x{:02X})", ch as char, ch);
+            let uart_status = emu.read_byte(0xFF0101);
+            if uart_status & 0x01 == 0 {
+                let ch = uart_input[uart_input_pos];
+                emu.send_uart_byte(ch);
+                if ch == b'!' {
+                    println!("[UART RX] '!'  (0x21) — halt signal");
+                } else if ch == b'\n' {
+                    println!("[UART RX] '\\n'");
+                } else {
+                    println!("[UART RX] '{}'  (0x{:02X})", ch as char, ch);
+                }
+                uart_input_pos += 1;
             }
-            uart_input_pos += 1;
         }
 
         if result.instructions_run == 0 {
@@ -176,6 +182,7 @@ struct CliArgs {
     trace: usize,                    // number of trace entries to dump (0 = off)
     step: bool,                      // step mode: print each instruction
     uart_never_ready: bool,          // UART TX never becomes ready (test polling)
+    terminal: bool,                  // bridge stdin/stdout to UART
 }
 
 fn parse_args() -> CliArgs {
@@ -192,6 +199,7 @@ fn parse_args() -> CliArgs {
         trace: 0,
         step: false,
         uart_never_ready: false,
+        terminal: false,
     };
 
     let mut i = 1;
@@ -277,6 +285,9 @@ fn parse_args() -> CliArgs {
             }
             "--uart-never-ready" => {
                 cli.uart_never_ready = true;
+            }
+            "--terminal" => {
+                cli.terminal = true;
             }
             _ => {
                 if cli.command.is_empty() && !args[i].starts_with('-') {
@@ -448,13 +459,16 @@ fn run_step_mode(emu: &mut EmulatorCore, max_instructions: i64, uart_input: &[u8
     println!("{}", "-".repeat(80));
 
     for n in 0..max {
-        // Feed UART input if available
-        if uart_pos < uart_input.len() && n > 0 && n % 100 == 0 {
-            let ch = uart_input[uart_pos];
-            emu.send_uart_byte(ch);
-            println!("  --- UART RX: 0x{:02X} ('{}') ---",
-                ch, if (0x20..=0x7E).contains(&ch) { ch as char } else { '.' });
-            uart_pos += 1;
+        // Feed UART input when previous byte consumed (FIFO drain)
+        if uart_pos < uart_input.len() {
+            let uart_status = emu.read_byte(0xFF0101);
+            if uart_status & 0x01 == 0 {
+                let ch = uart_input[uart_pos];
+                emu.send_uart_byte(ch);
+                println!("  --- UART RX: 0x{:02X} ('{}') ---",
+                    ch, if (0x20..=0x7E).contains(&ch) { ch as char } else { '.' });
+                uart_pos += 1;
+            }
         }
 
         let result = emu.step();
@@ -495,6 +509,193 @@ fn run_step_mode(emu: &mut EmulatorCore, max_instructions: i64, uart_input: &[u8
     }
 }
 
+// --- Terminal mode (raw termios) ---
+
+/// RAII guard that restores terminal settings on drop.
+struct TermiosGuard {
+    fd: libc::c_int,
+    original: libc::termios,
+}
+
+impl Drop for TermiosGuard {
+    fn drop(&mut self) {
+        unsafe { libc::tcsetattr(self.fd, libc::TCSAFLUSH, &self.original); }
+    }
+}
+
+/// Put stdin into raw mode (character-at-a-time, no echo, no signals).
+/// Returns a guard that restores the original settings on drop.
+fn set_raw_mode() -> Result<TermiosGuard, String> {
+    unsafe {
+        let fd = libc::STDIN_FILENO;
+        let mut original: libc::termios = std::mem::zeroed();
+        if libc::tcgetattr(fd, &mut original) != 0 {
+            return Err("tcgetattr failed".to_string());
+        }
+        let mut raw = original;
+        raw.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG);
+        raw.c_iflag &= !(libc::IXON | libc::ICRNL);
+        raw.c_cc[libc::VMIN] = 0;
+        raw.c_cc[libc::VTIME] = 0;
+        if libc::tcsetattr(fd, libc::TCSAFLUSH, &raw) != 0 {
+            return Err("tcsetattr failed".to_string());
+        }
+        Ok(TermiosGuard { fd, original })
+    }
+}
+
+/// Run the emulator in terminal mode: stdin→UART RX, UART TX→stdout.
+fn run_terminal_mode(emu: &mut EmulatorCore, speed: u64, time_limit: f64, max_instructions: i64) -> u64 {
+    let is_tty = unsafe { libc::isatty(libc::STDIN_FILENO) } != 0;
+
+    let _guard = if is_tty {
+        match set_raw_mode() {
+            Ok(g) => {
+                // Also install a panic hook that restores terminal
+                let orig = g.original;
+                let prev_hook = std::panic::take_hook();
+                std::panic::set_hook(Box::new(move |info| {
+                    unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSAFLUSH, &orig); }
+                    prev_hook(info);
+                }));
+                Some(g)
+            }
+            Err(e) => {
+                eprintln!("Warning: could not set raw mode: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    if is_tty {
+        // Use \r\n since we're in raw mode (no output processing)
+        eprint!("[cor24-run terminal mode \u{2014} Ctrl-] to exit]\r\n");
+    }
+
+    let batch_size: u64 = if speed == 0 { 10_000 } else { (speed / 100).max(100) };
+    let batch_duration = if speed == 0 {
+        Duration::ZERO
+    } else {
+        Duration::from_secs_f64(batch_size as f64 / speed as f64)
+    };
+
+    let time_limit_duration = if time_limit <= 0.0 {
+        Duration::from_secs(3600) // 1 hour default for terminal mode
+    } else {
+        Duration::from_secs_f64(time_limit)
+    };
+
+    let start = Instant::now();
+    let mut total_instructions: u64 = 0;
+    let mut batch_start = Instant::now();
+    let mut prev_uart_len = 0usize;
+    let mut stdin_buf: VecDeque<u8> = VecDeque::new();
+    let mut read_buf = [0u8; 256];
+    let stdin_fd = libc::STDIN_FILENO;
+    let mut stdout = std::io::stdout();
+    let mut stdin_eof = false;
+
+    emu.resume();
+
+    loop {
+        if start.elapsed() >= time_limit_duration {
+            break;
+        }
+        if max_instructions >= 0 && total_instructions >= max_instructions as u64 {
+            break;
+        }
+
+        let this_batch = if max_instructions >= 0 {
+            let remaining = (max_instructions as u64).saturating_sub(total_instructions);
+            batch_size.min(remaining).max(1)
+        } else {
+            batch_size
+        };
+
+        let result = emu.run_batch(this_batch);
+        total_instructions += result.instructions_run;
+
+        // TX: flush new UART output to stdout as raw bytes
+        let output = emu.get_uart_output();
+        if output.len() > prev_uart_len {
+            let new_bytes = &output.as_bytes()[prev_uart_len..];
+            if is_tty {
+                // In raw mode, translate \n to \r\n for proper terminal display
+                for &b in new_bytes {
+                    if b == b'\n' {
+                        let _ = stdout.write_all(b"\r\n");
+                    } else {
+                        let _ = stdout.write_all(&[b]);
+                    }
+                }
+            } else {
+                let _ = stdout.write_all(new_bytes);
+            }
+            let _ = stdout.flush();
+            prev_uart_len = output.len();
+        }
+
+        // RX: non-blocking read from stdin
+        if !stdin_eof {
+            let n = unsafe {
+                libc::read(stdin_fd, read_buf.as_mut_ptr() as *mut libc::c_void, read_buf.len())
+            };
+            if n > 0 {
+                for &b in &read_buf[..n as usize] {
+                    if b == 0x1D {
+                        // Ctrl-] — exit
+                        if is_tty {
+                            eprint!("\r\n[cor24-run exited]\r\n");
+                        }
+                        return total_instructions;
+                    }
+                    if stdin_buf.len() < 4096 {
+                        stdin_buf.push_back(b);
+                    }
+                }
+            } else if n == 0 && !is_tty {
+                // EOF on piped stdin
+                stdin_eof = true;
+            }
+        }
+
+        // Feed buffered input to UART when ready
+        if !stdin_buf.is_empty() {
+            let status = emu.read_byte(0xFF0101);
+            if status & 0x01 == 0 {
+                let ch = stdin_buf.pop_front().unwrap();
+                emu.send_uart_byte(ch);
+            }
+        }
+
+        if result.instructions_run == 0 {
+            if is_tty {
+                eprint!("\r\n[CPU halted]\r\n");
+            } else {
+                eprintln!("\n[CPU halted]");
+            }
+            break;
+        }
+
+        // Timing synchronization
+        if speed > 0 {
+            let elapsed = batch_start.elapsed();
+            if elapsed < batch_duration {
+                thread::sleep(batch_duration - elapsed);
+            }
+            batch_start = Instant::now();
+        }
+    }
+
+    if is_tty && start.elapsed() >= time_limit_duration {
+        eprint!("\r\n[time limit reached]\r\n");
+    }
+
+    total_instructions
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -515,11 +716,13 @@ fn main() {
         println!("  --step               Print each instruction as it executes");
         println!("  --uart-never-ready   UART TX stays busy forever (test polling)");
         println!("  --entry, -e <label>  Set entry point to label address");
+        println!("  --terminal           Bridge stdin/stdout to UART (interactive mode)");
         println!();
         println!("Example:");
         println!("  cor24-run --demo --speed 100000 --time 10");
         println!("  cor24-run --run prog.s --dump --speed 0");
         println!("  cor24-run --run echo.s -u 'abc!' --speed 0 --dump");
+        println!("  cor24-run --run repl.s --terminal --speed 0");
         return;
     }
 
@@ -603,6 +806,30 @@ fn main() {
                 if !found {
                     eprintln!("Warning: entry point '{}' not found, starting at 0x000000", entry_label);
                 }
+            }
+
+            if cli.terminal {
+                // Validate incompatible flags
+                if !cli.uart_input.is_empty() {
+                    eprintln!("Error: --terminal and --uart-input are incompatible");
+                    return;
+                }
+                if cli.step {
+                    eprintln!("Error: --terminal and --step are incompatible");
+                    return;
+                }
+
+                let speed = if cli.speed == DEFAULT_SPEED { 0 } else { cli.speed };
+                let time_limit = if cli.time_limit == DEFAULT_TIME_LIMIT { 0.0 } else { cli.time_limit };
+
+                let instructions = run_terminal_mode(&mut emu, speed, time_limit, cli.max_instructions);
+
+                eprintln!("Executed {} instructions", instructions);
+                if cli.trace > 0 {
+                    print!("{}", emu.trace().format_last(cli.trace));
+                }
+                if cli.dump { print_dump(&emu); }
+                return;
             }
 
             println!("Running (speed: {} IPS, time limit: {}s)...\n",
