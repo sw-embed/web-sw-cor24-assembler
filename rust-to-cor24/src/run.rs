@@ -21,6 +21,90 @@ const DEFAULT_SPEED: u64 = 100_000;
 /// Default time limit in seconds
 const DEFAULT_TIME_LIMIT: f64 = 10.0;
 
+const COPYRIGHT: &str = "Copyright (c) 2026 Michael A Wright";
+const LICENSE: &str = "MIT";
+const REPOSITORY: &str = "https://github.com/sw-embed/cor24-rs";
+
+fn print_version() {
+    println!(
+        "cor24-run {}\n{}\nLicense: {}\nRepository: {}\n\nBuild Information:\n  Host: {}\n  Commit: {}\n  Timestamp: {}",
+        env!("CARGO_PKG_VERSION"),
+        COPYRIGHT,
+        LICENSE,
+        REPOSITORY,
+        env!("BUILD_HOST"),
+        env!("GIT_HASH"),
+        env!("BUILD_TIMESTAMP"),
+    );
+}
+
+fn print_short_help() {
+    println!("cor24-run: COR24 assembler and emulator\n");
+    println!("Usage:");
+    println!("  cor24-run --demo [options]        Run built-in LED demo");
+    println!("  cor24-run --run <file.s> [opts]   Assemble and run");
+    println!("  cor24-run --assemble <in.s> <out.bin> <out.lst>");
+    println!();
+    println!("Options:");
+    println!("  -h                     Short help (this message)");
+    println!("  --help                 Extended help with AI agent guidance");
+    println!("  -V, --version          Version, copyright, license, build info");
+    println!("  --speed, -s <ips>      Instructions per second (default: {})", DEFAULT_SPEED);
+    println!("  --time, -t <secs>      Time limit in seconds (default: {})", DEFAULT_TIME_LIMIT);
+    println!("  --max-instructions, -n <count>  Stop after N instructions (-1 = no limit)");
+    println!("  --uart-input, -u <str> Send characters to UART RX (supports \\n, \\x21)");
+    println!("  --entry, -e <label>    Set entry point to label address");
+    println!("  --dump                 Dump CPU state, I/O, and non-zero memory after halt");
+    println!("  --trace <N>            Dump last N instructions on halt/timeout (default: 50)");
+    println!("  --step                 Print each instruction as it executes");
+    println!("  --terminal             Bridge stdin/stdout to UART (interactive mode)");
+    println!("  --echo                 Local echo in terminal mode (for programs that don't echo)");
+    println!("  --stack-kilobytes <3|8>  EBR stack size (default: 3, max: 8)");
+    println!("  --uart-never-ready     UART TX stays busy forever (test polling)");
+    println!();
+    println!("Examples:");
+    println!("  cor24-run --demo --speed 100000 --time 10");
+    println!("  cor24-run --run prog.s --dump --speed 0");
+    println!("  cor24-run --run echo.s -u 'abc!' --speed 0 --dump");
+    println!("  cor24-run --run repl.s --terminal --echo --speed 0");
+}
+
+fn print_long_help() {
+    print_short_help();
+    println!();
+    println!("=== Extended Help ===");
+    println!();
+    println!("COR24 Architecture:");
+    println!("  24-bit RISC CPU (C-Oriented RISC) designed for embedded systems education.");
+    println!("  3 general-purpose registers (r0, r1, r2), frame pointer (fp), stack pointer (sp).");
+    println!("  Variable-length instructions (1/2/4 bytes). 24-bit address space (16 MB).");
+    println!();
+    println!("Memory Map:");
+    println!("  000000-0FFFFF  SRAM (1 MB) — code and data");
+    println!("  FEE000-FEFFFF  EBR (8 KB) — stack (3 KB default, 8 KB with --stack-kilobytes 8)");
+    println!("  FF0000-FFFFFF  I/O — LED/switch at FF0000, UART at FF0100-FF0101");
+    println!();
+    println!("Terminal Mode (--terminal):");
+    println!("  Bridges stdin/stdout directly to the emulated UART for interactive programs");
+    println!("  (REPLs, shells, monitors). Raw terminal mode: Ctrl-C sends 0x03 to UART,");
+    println!("  Ctrl-] exits. Use --echo for programs that don't echo typed characters.");
+    println!("  Defaults to max speed and 1-hour time limit.");
+    println!("  Pipe-aware: works with piped input (echo '(+ 1 2)' | cor24-run --run repl.s --terminal).");
+    println!();
+    println!("UART I/O Registers:");
+    println!("  FF0100  Data: write to transmit, read to receive (auto-acknowledges RX)");
+    println!("  FF0101  Status: bit 0 = RX ready, bit 1 = CTS, bit 7 = TX busy");
+    println!();
+    println!("AI Agent Guidance:");
+    println!("  This tool assembles COR24 assembly (.s files) and runs them on an emulator.");
+    println!("  Assembly syntax follows the reference as24 assembler: labels on their own line,");
+    println!("  hex literals use FFh suffix (not 0xFF prefix), la for 24-bit immediates.");
+    println!("  The --dump flag is invaluable for debugging — it shows registers, stack, SRAM,");
+    println!("  and I/O state. Use --trace N to see the last N executed instructions.");
+    println!("  For interactive programs, use --terminal (optionally with --echo).");
+    println!("  Programs that need deep recursion should use --stack-kilobytes 8.");
+}
+
 fn print_leds(leds: u8) {
     print!("\rLEDs: ");
     for i in (0..8).rev() {
@@ -732,32 +816,17 @@ fn run_terminal_mode(emu: &mut EmulatorCore, speed: u64, time_limit: f64, max_in
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() < 2 {
-        println!("cor24-run: COR24 assembler and emulator\n");
-        println!("Usage:");
-        println!("  cor24-run --demo [options]        Run built-in LED demo");
-        println!("  cor24-run --run <file.s> [opts]   Assemble and run");
-        println!("  cor24-run --assemble <in.s> <out.bin> <out.lst>");
-        println!();
-        println!("Options:");
-        println!("  --speed, -s <ips>    Instructions per second (default: {})", DEFAULT_SPEED);
-        println!("  --time, -t <secs>    Time limit in seconds (default: {})", DEFAULT_TIME_LIMIT);
-        println!("  --max-instructions, -n <count>  Stop after N instructions (-1 = no limit, default)");
-        println!("  --uart-input, -u <str>  Send characters to UART RX (supports \\n, \\x21)");
-        println!("  --dump               Dump CPU state, I/O, and non-zero memory after halt");
-        println!("  --trace <N>          Dump last N instructions on halt/timeout (default: 50)");
-        println!("  --step               Print each instruction as it executes");
-        println!("  --uart-never-ready   UART TX stays busy forever (test polling)");
-        println!("  --entry, -e <label>  Set entry point to label address");
-        println!("  --terminal           Bridge stdin/stdout to UART (interactive mode)");
-        println!("  --echo               Local echo in terminal mode (for programs that don't echo)");
-        println!("  --stack-kilobytes <3|8>  EBR stack size (default: 3, max: 8)");
-        println!();
-        println!("Example:");
-        println!("  cor24-run --demo --speed 100000 --time 10");
-        println!("  cor24-run --run prog.s --dump --speed 0");
-        println!("  cor24-run --run echo.s -u 'abc!' --speed 0 --dump");
-        println!("  cor24-run --run repl.s --terminal --speed 0");
+    // Handle -h, --help, -V, --version before parsing other args
+    if args.len() < 2 || args.contains(&"-h".to_string()) {
+        print_short_help();
+        return;
+    }
+    if args.contains(&"--help".to_string()) {
+        print_long_help();
+        return;
+    }
+    if args.contains(&"-V".to_string()) || args.contains(&"--version".to_string()) {
+        print_version();
         return;
     }
 
