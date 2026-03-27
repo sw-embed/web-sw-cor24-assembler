@@ -59,6 +59,7 @@ fn print_short_help() {
     println!("  --step                 Print each instruction as it executes");
     println!("  --terminal             Bridge stdin/stdout to UART (interactive mode)");
     println!("  --echo                 Local echo in terminal mode (for programs that don't echo)");
+    println!("  --load-binary <file>@<addr>  Load raw bytes into memory at address");
     println!("  --stack-kilobytes <3|8>  EBR stack size (default: 3, max: 8)");
     println!("  --uart-never-ready     UART TX stays busy forever (test polling)");
     println!();
@@ -67,6 +68,7 @@ fn print_short_help() {
     println!("  cor24-run --run prog.s --dump --speed 0");
     println!("  cor24-run --run echo.s -u 'abc!' --speed 0 --dump");
     println!("  cor24-run --run repl.s --terminal --echo --speed 0");
+    println!("  cor24-run --run pvm.s --load-binary hello.p24@0x010000 --terminal");
 }
 
 fn print_long_help() {
@@ -103,6 +105,8 @@ fn print_long_help() {
     println!("  and I/O state. Use --trace N to see the last N executed instructions.");
     println!("  For interactive programs, use --terminal (optionally with --echo).");
     println!("  Programs that need deep recursion should use --stack-kilobytes 8.");
+    println!("  Use --load-binary <file>@<addr> to load guest binaries (p24, forth, etc)");
+    println!("  into memory after the host program is assembled. Repeatable for multiple files.");
 }
 
 fn print_leds(leds: u8) {
@@ -269,6 +273,7 @@ struct CliArgs {
     terminal: bool,                  // bridge stdin/stdout to UART
     echo: bool,                      // echo stdin to stdout in terminal mode
     stack_kb: u32,                   // stack size in KB (3 or 8)
+    load_binaries: Vec<(String, u32)>, // (file_path, load_address) pairs
 }
 
 fn parse_args() -> CliArgs {
@@ -288,6 +293,7 @@ fn parse_args() -> CliArgs {
         terminal: false,
         echo: false,
         stack_kb: 3,
+        load_binaries: Vec::new(),
     };
 
     let mut i = 1;
@@ -387,6 +393,35 @@ fn parse_args() -> CliArgs {
                         Ok(8) => cli.stack_kb = 8,
                         _ => {
                             eprintln!("Error: --stack-kilobytes must be 3 or 8");
+                            std::process::exit(1);
+                        }
+                    }
+                    i += 1;
+                }
+            }
+            "--load-binary" => {
+                if i + 1 < args.len() {
+                    let spec = &args[i + 1];
+                    match spec.rsplit_once('@') {
+                        Some((file, addr_str)) => {
+                            let addr_str = addr_str.trim();
+                            let addr = if addr_str.starts_with("0x") || addr_str.starts_with("0X") {
+                                u32::from_str_radix(&addr_str[2..], 16)
+                            } else if addr_str.ends_with('h') || addr_str.ends_with('H') {
+                                u32::from_str_radix(&addr_str[..addr_str.len()-1], 16)
+                            } else {
+                                addr_str.parse::<u32>()
+                            };
+                            match addr {
+                                Ok(a) => cli.load_binaries.push((file.to_string(), a)),
+                                Err(_) => {
+                                    eprintln!("Error: invalid address in --load-binary '{}' (expected <file>@<addr>)", spec);
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                        None => {
+                            eprintln!("Error: --load-binary requires <file>@<addr> format (e.g., hello.p24@0x010000)");
                             std::process::exit(1);
                         }
                     }
@@ -897,6 +932,18 @@ fn main() {
                 emu.set_reg(4, 0xFF0000); // SP = top of full EBR window
             }
             load_assembled(&mut emu, &result);
+
+            // Load binary files into memory at specified addresses
+            for (file_path, addr) in &cli.load_binaries {
+                let data = fs::read(file_path).unwrap_or_else(|e| {
+                    eprintln!("Error: cannot read binary file '{}': {}", file_path, e);
+                    std::process::exit(1);
+                });
+                for (i, &b) in data.iter().enumerate() {
+                    emu.write_byte(addr + i as u32, b);
+                }
+                println!("Loaded {} bytes from '{}' at 0x{:06X}", data.len(), file_path, addr);
+            }
 
             if let Some(entry_label) = &cli.entry {
                 // Find label address in assembly result
