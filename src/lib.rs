@@ -17,16 +17,16 @@ pub mod cpu;
 pub mod emulator;
 pub mod loader;
 
-// Yew app (only for wasm32 target)
-#[cfg(target_arch = "wasm32")]
+// Yew app (only for standalone wasm32 builds)
+#[cfg(all(target_arch = "wasm32", feature = "standalone"))]
 pub mod app;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "standalone"))]
 pub mod c_examples;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "standalone"))]
 pub mod rust_examples;
 
-// WASM bindings (only for wasm32 target)
-#[cfg(target_arch = "wasm32")]
+// WASM bindings (only for standalone wasm32 builds)
+#[cfg(all(target_arch = "wasm32", feature = "standalone"))]
 pub mod wasm;
 
 // Re-export main types for convenience
@@ -36,4 +36,4 @@ pub use cpu::{
     CpuState, DecodeRom, ExecuteResult, Executor, INITIAL_SP, MEMORY_SIZE, RESET_ADDRESS,
 };
 pub use emulator::{BatchResult, CpuSnapshot, EmulatorCore, StopReason};
-pub use loader::{load_lgo, LoadResult};
+pub use loader::{LoadResult, load_lgo};

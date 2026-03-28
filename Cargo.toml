@@ -13,6 +13,10 @@ description = "COR24 C-Oriented RISC 24-bit Assembly Emulator"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["standalone"]
+standalone = []
+
 [dependencies]
 cor24-isa = { path = "./isa", features = ["serde"] }
 components = { path = "./components" }
