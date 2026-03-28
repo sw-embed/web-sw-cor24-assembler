@@ -62,6 +62,7 @@ fn print_short_help() {
     println!("  --echo                 Local echo in terminal mode (for programs that don't echo)");
     println!("  --load-binary <file>@<addr>  Load raw bytes into memory at address");
     println!("  --patch <addr>=<value> Write 24-bit value to memory (repeatable)");
+    println!("  --base-addr <addr>     Base address for assembly (default: 0)");
     println!("  --stack-kilobytes <3|8>  EBR stack size (default: 3, max: 8)");
     println!("  --uart-never-ready     UART TX stays busy forever (test polling)");
     println!();
@@ -289,6 +290,7 @@ struct CliArgs {
     stack_kb: u32,                   // stack size in KB (3 or 8)
     load_binaries: Vec<(String, u32)>, // (file_path, load_address) pairs
     patches: Vec<(u32, u32)>,           // (address, 24-bit value) pairs
+    base_addr: u32,                     // base address for assembly (--base-addr)
 }
 
 /// Parse a numeric address string: 0x prefix, h suffix, or decimal.
@@ -321,6 +323,7 @@ fn parse_args() -> CliArgs {
         stack_kb: 3,
         load_binaries: Vec::new(),
         patches: Vec::new(),
+        base_addr: 0,
     };
 
     let mut i = 1;
@@ -441,6 +444,18 @@ fn parse_args() -> CliArgs {
                         }
                         None => {
                             eprintln!("Error: --load-binary requires <file>@<addr> format (e.g., hello.p24@0x010000)");
+                            std::process::exit(1);
+                        }
+                    }
+                    i += 1;
+                }
+            }
+            "--base-addr" => {
+                if i + 1 < args.len() {
+                    match parse_numeric_addr(args[i + 1].trim()) {
+                        Some(a) => cli.base_addr = a,
+                        None => {
+                            eprintln!("Error: invalid --base-addr '{}' (expected address, e.g., 0x010000)", args[i + 1]);
                             std::process::exit(1);
                         }
                     }
@@ -1108,7 +1123,7 @@ fn main() {
             }
             let source = fs::read_to_string(&args[2]).expect("Cannot read file");
             let mut asm = Assembler::new();
-            let result = asm.assemble(&source);
+            let result = asm.assemble_at(&source, cli.base_addr);
             if !result.errors.is_empty() {
                 eprintln!("Assembly error: {}", result.errors.join("\n"));
                 return;
@@ -1128,7 +1143,11 @@ fn main() {
                     writeln!(lst_file, "                    {}", line.source).ok();
                 }
             }
-            println!("Wrote {} bytes to {}", machine_code.len(), args[3]);
+            if cli.base_addr != 0 {
+                println!("Assembled {} bytes at base 0x{:06X} to {}", machine_code.len(), cli.base_addr, args[3]);
+            } else {
+                println!("Assembled {} bytes to {}", machine_code.len(), args[3]);
+            }
             println!("Wrote listing to {}", args[4]);
         }
 
@@ -1357,6 +1376,32 @@ mod tests {
         emu.run_batch(100);
         let snap = emu.snapshot();
         assert_eq!(snap.regs[0], 42);
+        assert!(snap.halted);
+    }
+
+    #[test]
+    fn test_assemble_at_base_and_load() {
+        // Assemble at 0x010000, load at 0x010000, verify la resolves correctly
+        let mut asm = Assembler::new();
+        let code = "la r0, target\ntarget:\n  lc r1, 99\nhalt:\n  bra halt";
+        let result = asm.assemble_at(code, 0x010000);
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+
+        // target should be at 0x010004 (la is 4 bytes)
+        assert_eq!(result.labels["target"], 0x010004);
+
+        // Load at 0x010000 and run
+        let mut emu = EmulatorCore::new();
+        for (i, &b) in result.bytes.iter().enumerate() {
+            emu.write_byte(0x010000 + i as u32, b);
+        }
+        emu.set_pc(0x010000);
+        emu.resume();
+        emu.run_batch(100);
+        let snap = emu.snapshot();
+        // la r0, target should have loaded 0x010004 into r0
+        assert_eq!(snap.regs[0], 0x010004);
+        assert_eq!(snap.regs[1], 99);
         assert!(snap.halted);
     }
 }

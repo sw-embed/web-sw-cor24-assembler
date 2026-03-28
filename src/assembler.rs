@@ -28,8 +28,10 @@ pub struct AssembledLine {
 
 /// COR24 Assembler
 pub struct Assembler {
-    /// Current address
+    /// Current address (base_address + offset into output)
     address: u32,
+    /// Base address for label resolution (default 0)
+    base_address: u32,
     /// Symbol table
     labels: HashMap<String, u32>,
     /// Forward references to resolve
@@ -66,6 +68,7 @@ impl Assembler {
     pub fn new() -> Self {
         Self {
             address: 0,
+            base_address: 0,
             labels: HashMap::new(),
             forward_refs: Vec::new(),
             output: Vec::new(),
@@ -74,9 +77,22 @@ impl Assembler {
         }
     }
 
+    /// Convert an absolute address to an index into self.output
+    fn output_index(&self, addr: u32) -> usize {
+        (addr - self.base_address) as usize
+    }
+
     /// Assemble source code
     pub fn assemble(&mut self, source: &str) -> AssemblyResult {
-        self.address = 0;
+        self.assemble_at(source, 0)
+    }
+
+    /// Assemble source code with labels resolved relative to base_address.
+    /// The output bytes still start at offset 0 (no leading padding), but
+    /// all label addresses are base_address + offset.
+    pub fn assemble_at(&mut self, source: &str, base_address: u32) -> AssemblyResult {
+        self.address = base_address;
+        self.base_address = base_address;
         self.labels.clear();
         self.forward_refs.clear();
         self.output.clear();
@@ -92,12 +108,13 @@ impl Assembler {
         self.resolve_forward_refs();
 
         // Update line bytes from resolved output
+        let base = self.base_address;
         for line in &mut self.lines {
             if !line.bytes.is_empty() {
-                let addr = line.address as usize;
+                let idx = (line.address - base) as usize;
                 let len = line.bytes.len();
-                if addr + len <= self.output.len() {
-                    line.bytes = self.output[addr..addr + len].to_vec();
+                if idx + len <= self.output.len() {
+                    line.bytes = self.output[idx..idx + len].to_vec();
                 }
             }
         }
@@ -208,7 +225,12 @@ impl Assembler {
                     && let Some(addr) = self.parse_number(parts[1])
                 {
                     // Pad output to reach the new address
-                    while self.output.len() < addr as usize {
+                    let target_idx = if addr >= self.base_address {
+                        (addr - self.base_address) as usize
+                    } else {
+                        addr as usize
+                    };
+                    while self.output.len() < target_idx {
                         self.output.push(0);
                     }
                     self.address = addr;
@@ -940,11 +962,11 @@ impl Assembler {
             if let Some(&target_addr) = self.labels.get(&fref.label) {
                 match fref.ref_type {
                     RefType::Absolute24 => {
-                        let addr = fref.address as usize;
-                        if addr + 2 < self.output.len() {
-                            self.output[addr] = (target_addr & 0xFF) as u8;
-                            self.output[addr + 1] = ((target_addr >> 8) & 0xFF) as u8;
-                            self.output[addr + 2] = ((target_addr >> 16) & 0xFF) as u8;
+                        let idx = self.output_index(fref.address);
+                        if idx + 2 < self.output.len() {
+                            self.output[idx] = (target_addr & 0xFF) as u8;
+                            self.output[idx + 1] = ((target_addr >> 8) & 0xFF) as u8;
+                            self.output[idx + 2] = ((target_addr >> 16) & 0xFF) as u8;
                         }
                     }
                     RefType::Relative8 => {
@@ -953,9 +975,9 @@ impl Assembler {
                         let branch_base = fref.address + 3;
                         let offset = (target_addr as i32) - (branch_base as i32);
                         if (-128..=127).contains(&offset) {
-                            let addr = fref.address as usize;
-                            if addr < self.output.len() {
-                                self.output[addr] = offset as u8;
+                            let idx = self.output_index(fref.address);
+                            if idx < self.output.len() {
+                                self.output[idx] = offset as u8;
                             }
                         } else {
                             self.errors.push(format!(
@@ -1384,5 +1406,71 @@ halt:
                 result.errors
             );
         }
+    }
+
+    // --- assemble_at (base address) tests ---
+
+    #[test]
+    fn test_assemble_at_labels_resolve_with_base() {
+        let mut asm = Assembler::new();
+        let result = asm.assemble_at("start:\n  lc r0, 42", 0x010000);
+        assert!(result.errors.is_empty(), "Errors: {:?}", result.errors);
+        // Label should resolve to base address
+        assert_eq!(result.labels["start"], 0x010000);
+        // Output bytes should be the same as without base
+        assert_eq!(result.bytes, vec![0x44, 42]);
+    }
+
+    #[test]
+    fn test_assemble_at_forward_ref_absolute() {
+        // la r0, target should resolve to base + offset
+        let mut asm = Assembler::new();
+        let result = asm.assemble_at("la r0, target\ntarget:\n  nop", 0x020000);
+        assert!(result.errors.is_empty(), "Errors: {:?}", result.errors);
+        // la r0 is 4 bytes, nop is 1 byte. target is at base + 4 = 0x020004
+        assert_eq!(result.labels["target"], 0x020004);
+        // la encoding: opcode + 3 bytes LE address
+        assert_eq!(result.bytes[1], 0x04); // low byte of 0x020004
+        assert_eq!(result.bytes[2], 0x00);
+        assert_eq!(result.bytes[3], 0x02); // high byte
+    }
+
+    #[test]
+    fn test_assemble_at_branch_relative_unchanged() {
+        // Branches are PC-relative, so base address shouldn't affect offset
+        let mut asm = Assembler::new();
+        let code = "loop:\n  add r0, -1\n  ceq r0, z\n  brf loop";
+        let r1 = asm.assemble(code);
+
+        let mut asm2 = Assembler::new();
+        let r2 = asm2.assemble_at(code, 0x050000);
+
+        assert!(r1.errors.is_empty());
+        assert!(r2.errors.is_empty());
+        // Output bytes should be identical — branches are relative
+        assert_eq!(r1.bytes, r2.bytes);
+    }
+
+    #[test]
+    fn test_assemble_at_zero_same_as_assemble() {
+        let code = "lc r0, 10\nla r1, 255\nhalt:\n  bra halt";
+        let mut asm1 = Assembler::new();
+        let r1 = asm1.assemble(code);
+        let mut asm2 = Assembler::new();
+        let r2 = asm2.assemble_at(code, 0);
+        assert_eq!(r1.bytes, r2.bytes);
+        assert_eq!(r1.labels, r2.labels);
+    }
+
+    #[test]
+    fn test_assemble_at_word_label_ref() {
+        let mut asm = Assembler::new();
+        let result = asm.assemble_at("func:\n  nop\ntable:\n  .word func", 0x030000);
+        assert!(result.errors.is_empty(), "Errors: {:?}", result.errors);
+        // func is at 0x030000, nop is 1 byte, table at 0x030001
+        // .word func should emit 0x030000 as 3 bytes LE
+        assert_eq!(result.bytes[1], 0x00); // low byte of 0x030000
+        assert_eq!(result.bytes[2], 0x00);
+        assert_eq!(result.bytes[3], 0x03); // high byte
     }
 }
