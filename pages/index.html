@@ -6,13 +6,12 @@
     <title>MakerLisp COR24 — Assembly Emulator</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="stylesheet" href="/cor24-rs/asm-game-d886b7c0db9048f6.css" integrity="sha384-H3TKXTiqeX7/JJHDstXFWNz9ZeqfdsNvrtSeUjPmmPA1RnCHBDjHGuvZGd1RlGXe"/>
-    <link rel="stylesheet" href="/cor24-rs/layout-f8cc5459d5d65afa.css" integrity="sha384-VXMRWz98QHgKe2yCiuJ6ZxgQPMTeTIb0Pur/TW25YQrxBFADNu9ljrjPDYj+2rKz"/>
-    
+    <link rel="stylesheet" href="/web-sw-cor24-assembler/asm-game-d886b7c0db9048f6.css" integrity="sha384-H3TKXTiqeX7/JJHDstXFWNz9ZeqfdsNvrtSeUjPmmPA1RnCHBDjHGuvZGd1RlGXe"/>
+    <link rel="stylesheet" href="/web-sw-cor24-assembler/layout-f8cc5459d5d65afa.css" integrity="sha384-VXMRWz98QHgKe2yCiuJ6ZxgQPMTeTIb0Pur/TW25YQrxBFADNu9ljrjPDYj+2rKz"/>
     
 <script type="module">
-import init, * as bindings from '/cor24-rs/cor24-emulator-d6c69d8b74c32816.js';
-const wasm = await init({ module_or_path: '/cor24-rs/cor24-emulator-d6c69d8b74c32816_bg.wasm' });
+import init, * as bindings from '/web-sw-cor24-assembler/web-sw-cor24-assembler-a9461981fa5fe502.js';
+const wasm = await init({ module_or_path: '/web-sw-cor24-assembler/web-sw-cor24-assembler-a9461981fa5fe502_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -21,8 +20,7 @@ window.wasmBindings = bindings;
 dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
 </script>
-    <script defer src="showme.js"></script>
-<link rel="modulepreload" href="/cor24-rs/cor24-emulator-d6c69d8b74c32816.js" crossorigin="anonymous" integrity="sha384-JR05gCvxR++rmgh0Z9azbb1wGlOPDQURkRcXunMozI2E9NDqgEYjsYzS0G77iwb7"><link rel="preload" href="/cor24-rs/cor24-emulator-d6c69d8b74c32816_bg.wasm" crossorigin="anonymous" integrity="sha384-dcmUFLvrb7ZoX1RFWFmUm3Vv/HtiqWR8CUlMpIO+jCA0EsLU7Q9j0vDsNQfnKdfO" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="/web-sw-cor24-assembler/web-sw-cor24-assembler-a9461981fa5fe502.js" crossorigin="anonymous" integrity="sha384-Ku9stXso4Srn8h+gKZKbQVN/5mGjeiJFqlvqvAjQ4ZG3fFeKxJpsIFRiFQ9+Unkb"><link rel="preload" href="/web-sw-cor24-assembler/web-sw-cor24-assembler-a9461981fa5fe502_bg.wasm" crossorigin="anonymous" integrity="sha384-Nt57dcoYk0biIa8uDf8WbXq7QtsYAIcRtBCjhgF3s83TwYW/S/r4P1IfIHo1rKm8" as="fetch" type="application/wasm"></head>
 <body>
 </body>
 </html>

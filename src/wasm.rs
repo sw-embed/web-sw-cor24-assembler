@@ -3,10 +3,10 @@
 //! This module provides JavaScript-accessible interfaces to the CPU.
 //! WasmCpu wraps EmulatorCore for consistent behavior with the CLI.
 
-use crate::assembler::{Assembler, AssemblyResult};
+use cor24_emulator::{Assembler, AssemblyResult};
 use crate::challenge::get_challenges;
-use crate::cpu::{CpuState, ExecuteResult, Executor};
-use crate::emulator::EmulatorCore;
+use cor24_emulator::cpu::{CpuState, ExecuteResult, Executor};
+use cor24_emulator::EmulatorCore;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
@@ -113,9 +113,9 @@ impl WasmCpu {
     pub fn step(&mut self) -> Result<bool, JsValue> {
         let result = self.emu.step();
         match result.reason {
-            crate::emulator::StopReason::CycleLimit => Ok(true),
-            crate::emulator::StopReason::Halted => Ok(false),
-            crate::emulator::StopReason::InvalidInstruction(byte) => Err(JsValue::from_str(
+            cor24_emulator::StopReason::CycleLimit => Ok(true),
+            cor24_emulator::StopReason::Halted => Ok(false),
+            cor24_emulator::StopReason::InvalidInstruction(byte) => Err(JsValue::from_str(
                 &format!("Invalid instruction: 0x{:02X}", byte),
             )),
             _ => Ok(true),
@@ -128,8 +128,8 @@ impl WasmCpu {
         let result = self.emu.run_batch(max_instructions as u64);
         !matches!(
             result.reason,
-            crate::emulator::StopReason::Halted
-                | crate::emulator::StopReason::InvalidInstruction(_)
+            cor24_emulator::StopReason::Halted
+                | cor24_emulator::StopReason::InvalidInstruction(_)
         )
     }
 
@@ -138,11 +138,11 @@ impl WasmCpu {
         self.emu.resume();
         let result = self.emu.run_batch(100_000);
         match result.reason {
-            crate::emulator::StopReason::CycleLimit
-            | crate::emulator::StopReason::Halted
-            | crate::emulator::StopReason::Paused
-            | crate::emulator::StopReason::Breakpoint(_) => Ok(()),
-            crate::emulator::StopReason::InvalidInstruction(byte) => Err(JsValue::from_str(
+            cor24_emulator::StopReason::CycleLimit
+            | cor24_emulator::StopReason::Halted
+            | cor24_emulator::StopReason::Paused
+            | cor24_emulator::StopReason::Breakpoint(_) => Ok(()),
+            cor24_emulator::StopReason::InvalidInstruction(byte) => Err(JsValue::from_str(
                 &format!("Invalid instruction: 0x{:02X}", byte),
             )),
         }

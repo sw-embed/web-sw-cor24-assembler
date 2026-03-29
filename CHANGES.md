@@ -1,5 +1,18 @@
 # Changes
 
+## 2026-03-29
+
+- **BREAKING**: Repository trimmed to web IDE scope
+  - Removed CLI tools, rust-to-cor24 pipeline, ISA crate, CPU/assembler/emulator source
+  - Now depends on `cor24-emulator` and `cor24-assembler` as path dependencies
+  - Package renamed from `cor24-emulator` to `web-sw-cor24-assembler`
+  - Removed `build.rs` (vergen build metadata); footer simplified
+  - Removed workspace — standalone crate with local `components/` dependency
+  - Added `scripts/build-pages.sh` and `scripts/serve.sh`
+  - Updated `Trunk.toml` public_url to `/web-sw-cor24-assembler/`
+  - All Yew UI components, examples, challenges, and styles preserved
+  - `trunk build --release` verified passing
+
 ## 2026-03-28
 
 - **BREAKING**: LED active-low polarity matches hardware (0=ON, 1=OFF)

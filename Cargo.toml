@@ -1,14 +1,10 @@
-[workspace]
-members = [".", "components", "cli", "isa"]
-resolver = "2"
-
 [package]
-name = "cor24-emulator"
+name = "web-sw-cor24-assembler"
 version = "0.1.0"
 edition = "2024"
 authors = ["Michael A Wright"]
 license = "MIT"
-description = "COR24 C-Oriented RISC 24-bit Assembly Emulator"
+description = "COR24 Assembly Emulator — Web IDE"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -18,7 +14,8 @@ default = ["standalone"]
 standalone = []
 
 [dependencies]
-cor24-isa = { path = "./isa", features = ["serde"] }
+cor24-emulator = { path = "../sw-cor24-emulator" }
+cor24-assembler = { path = "../sw-cor24-assembler" }
 components = { path = "./components" }
 yew = { version = "0.21", features = ["csr"] }
 wasm-bindgen = "0.2"

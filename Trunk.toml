@@ -1,7 +1,7 @@
 [build]
 dist = "pages"
 release = true
-public_url = "/cor24-rs/"
+public_url = "/web-sw-cor24-assembler/"
 
 [serve]
 address = "0.0.0.0"

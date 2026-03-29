@@ -1,8 +1,8 @@
 //! Challenge system and self-test for COR24 emulator
 
-use crate::assembler::Assembler;
-use crate::cpu::CpuState;
-use crate::cpu::executor::Executor;
+use cor24_emulator::Assembler;
+use cor24_emulator::cpu::CpuState;
+use cor24_emulator::cpu::Executor;
 
 /// A challenge for the user to complete
 #[derive(Clone)]

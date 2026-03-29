@@ -1173,13 +1173,7 @@ pub fn app() -> Html {
                 <span class="footer-sep">{"\u{00B7}"}</span>
                 <span>{"© 2026 Michael A Wright"}</span>
                 <span class="footer-sep">{"\u{00B7}"}</span>
-                <span>{env!("VERGEN_BUILD_HOST")}</span>
-                <span class="footer-sep">{"\u{00B7}"}</span>
-                <span>{env!("VERGEN_GIT_SHA_SHORT")}</span>
-                <span class="footer-sep">{"\u{00B7}"}</span>
-                <span>{env!("VERGEN_BUILD_TIMESTAMP")}</span>
-                <span class="footer-sep">{"\u{00B7}"}</span>
-                <a href="https://github.com/sw-embed/cor24-rs/blob/main/CHANGES.md" target="_blank" class="footer-link">{"Changes"}</a>
+                <a href="https://github.com/sw-embed/web-sw-cor24-assembler/blob/main/CHANGES.md" target="_blank" class="footer-link">{"Changes"}</a>
             </footer>
         </div>
     }
