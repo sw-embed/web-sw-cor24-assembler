@@ -29,7 +29,7 @@ cargo check --target wasm32-unknown-unknown  # full wasm check
 ## Dependencies
 
 - `cor24-emulator` (path: `../sw-cor24-emulator`) — CPU, ISA, assembler, emulator core
-- `cor24-assembler` (path: `../sw-cor24-assembler`) — assembler library
+- `cor24-assembler` (path: `../sw-cor24-x-assembler`) — assembler library
 - `components` (local) — Yew UI components
 
 ## Commit Discipline

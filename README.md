@@ -6,7 +6,7 @@ Written in Rust, compiled to WebAssembly via [Trunk](https://trunkrs.dev/).
 ## Dependencies
 
 - [sw-cor24-emulator](https://github.com/sw-embed/sw-cor24-emulator) — CPU emulator and ISA
-- [sw-cor24-assembler](https://github.com/sw-embed/sw-cor24-assembler) — assembler library
+- [sw-cor24-x-assembler](https://github.com/sw-embed/sw-cor24-x-assembler) — assembler library
 
 ## Build
 
